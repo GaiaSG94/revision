@@ -1,18 +1,17 @@
 # Demo guide for judges
 
-## Live demo status — read this first
+## Live demo
 
-No live URL is claimed for this rebranded submission. The configuration exists to publish the
-static app with GitHub Pages: `.github/workflows/pages.yml` builds with `VITE_BASE=/revision/` on
-every push to `main`. However, at the time of writing (2026-11-22) that URL was **not serving a
-deployment** (it returned HTTP 404). An earlier, pre-existing deployment of the upstream project
-was public, but it is not this submission and must not be used as evidence for it — see
-[`PROVENANCE.md`](PROVENANCE.md).
+**<https://gaiasg94.github.io/revision/>** — public HTTPS, no account, no installation. Verified
+HTTP 200 after the `pages` workflow succeeded. It is served by GitHub Pages from this repository's
+`main` branch (`.github/workflows/pages.yml`, `VITE_BASE=/revision/`). The live path's model calls
+depend on a configured edge proxy or a user-supplied key; the offline path below does not.
 
-**What this means:** the reliable, self-contained demonstration is the **offline path below**. It
-needs no API key, no account, no network access and no deployed service. If a live deployment is
-published later, the submitter should add its verified URL here; until then, judges should use the
-local steps.
+An older deployment of the upstream project exists under a different name; it is **not** evidence
+for this submission — see [`PROVENANCE.md`](PROVENANCE.md).
+
+**Recommended fallback:** the self-contained offline path below needs no API key, no account, no
+network access and no deployed service. Judges can use either path.
 
 ## Offline demo path (recommended)
 
@@ -40,7 +39,8 @@ they are not model inference times. This is stated explicitly in the project doc
 
 ## Verifying the offline demo
 
-- `npm test` — runs the offline suite; live tests are skipped without a key.
+- `npm test` — runs the offline suite only (live API tests are excluded by `vitest.config.ts`).
+  `npm run test:live` runs the optional live validation when credentials are configured.
 - `npm run typecheck` — strict TypeScript check.
 - `npm run build` — production build into `dist/`.
 - Open the browser Network tab: offline replay performs **no** model request. For a live analysis,

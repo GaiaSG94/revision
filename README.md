@@ -3,16 +3,17 @@
 > Photograph your corrected math paper. Revision finds the mistake you keep repeating — and builds
 > the exercise that works exactly on it.
 
-[![Demo guide](https://img.shields.io/badge/demo-offline-f2a516?style=flat-square)](DEMO.md)
+[![Live demo](https://img.shields.io/badge/demo-live-f2a516?style=flat-square)](https://gaiasg94.github.io/revision/)
+[![Demo guide](https://img.shields.io/badge/demo-guide-9aa3b2?style=flat-square)](DEMO.md)
 [![CI](https://img.shields.io/github/actions/workflow/status/GaiaSG94/revision/ci.yml?branch=main&label=ci&style=flat-square)](https://github.com/GaiaSG94/revision/actions/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/tests-offline%20suite-43d18c?style=flat-square)](tests)
 [![MIT licence](https://img.shields.io/badge/licence-MIT-9aa3b2?style=flat-square)](LICENSE)
 
 ## Try it now
 
-**No live URL is claimed for this rebranded submission.** At the time of writing the configured
-Pages URL did not serve a deployment. The dependable, key-free and network-free demonstration is
-the local offline demo — see [`DEMO.md`](DEMO.md).
+**<https://gaiasg94.github.io/revision/>** — public HTTPS, no account, nothing to install
+(verified HTTP 200). For a fully self-contained, key-free and network-free walkthrough, use the
+local offline demo described in [`DEMO.md`](DEMO.md).
 
 | You want to… | Do this |
 |---|---|
@@ -181,7 +182,7 @@ Variables: see [`.env.example`](.env.example).
 | RNF-05 | mobile (direct photo) | required | `capture="environment"`, targets ≥ 48 px |
 | RNF-06 | accessibility AA, keyboard, ≥ 16 px | required | visible focus, `aria-live`, text ≥ 16 px |
 | RNF-07 | initial bundle | < 300 KB gzip | ~127 KB gzip JS + 8 KB CSS |
-| RNF-08 | availability | 24/7 | GitHub Pages workflow configured (static, no backend); verify current deployment — see [`DEMO.md`](DEMO.md) |
+| RNF-08 | availability | 24/7 | GitHub Pages deployment live and verified (static, no backend) — see [`DEMO.md`](DEMO.md) |
 | RNF-09 | quota exhausted → clear message + BYOK | required | plain-English message, BYOK field |
 | RNF-10 | no paid dependency | required | $0 |
 
@@ -223,5 +224,5 @@ verifiable from the preserved Git history (`git log`).
   [`CREDITS.md`](CREDITS.md).
 - **No exposed secrets:** no credentials are committed; environment-variable names and handling
   rules are in [`SECURITY.md`](SECURITY.md).
-- **Accessible demonstration:** setup and the key-free offline demo are explained in
-  [`DEMO.md`](DEMO.md); no undeployed live URL is advertised.
+- **Accessible demonstration:** the live URL is <https://gaiasg94.github.io/revision/>; setup and
+  the key-free offline demo are explained in [`DEMO.md`](DEMO.md).
