@@ -1,9 +1,9 @@
 /**
- * Sommaire unique de l'écran « Comment ça marche ».
+ * Single table of contents for the "How it works" screen.
  *
- * Chaque section lit ici son ancre et son titre ; l'écran y lit son sommaire.
- * Aucune chaîne n'est recopiée d'un fichier à l'autre : ajouter une section,
- * c'est ajouter une entrée ici.
+ * Each section reads its anchor and title here; the screen reads its table of
+ * contents here. No string is copied from one file to another: adding a section
+ * means adding an entry here.
  */
 export const SECTIONS = {
   pipeline: { id: 'pipeline', titre: 'The pipeline, step by step' },
@@ -17,5 +17,5 @@ export const SECTIONS = {
 
 export type SectionDef = (typeof SECTIONS)[keyof typeof SECTIONS]
 
-/** Ordre d'affichage : l'ordre de déclaration ci-dessus. */
+/** Display order: the declaration order above. */
 export const SOMMAIRE: readonly SectionDef[] = Object.values(SECTIONS)

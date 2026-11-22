@@ -1,11 +1,10 @@
 /**
- * Crash test — volume. Un élève assidu, un professeur qui photographie un paquet
- * de 200 copies, un historique qui grossit pendant des mois : rien ne doit
- * ralentir au point de geler l'UI, ni produire de NaN, ni exploser en mémoire.
+ * Crash test — volume. A diligent student, a teacher photographing a batch of
+ * 200 papers, a history growing for months: nothing may slow down enough to
+ * freeze the UI, produce a NaN, or blow up memory.
  *
- * Les bornes de temps sont volontairement larges (une CI sur runner partagé
- * varie) : l'objectif est d'attraper une complexité quadratique, pas de battre
- * un record.
+ * Time bounds are deliberately loose (CI on shared runners varies): the goal
+ * is to catch quadratic complexity, not to set a record.
  */
 import { describe, expect, it } from 'vitest'
 import { statsClasse } from '../../src/domain/classe'
@@ -17,7 +16,7 @@ import { occurrencesParCopie, pointsCourbe, tendance } from '../../src/domain/pr
 import { ficheEnMarkdown, profilEnCsv, statsEnCsv } from '../../src/export/exports'
 import type { Diagnostic, Erreur, Profil } from '../../src/domain/types'
 
-/** Générateur déterministe : même graine, même corpus (pas de test qui flotte). */
+/** Deterministic generator: same seed, same corpus (no flaky test). */
 function aleatoire(graine: number): () => number {
   let etat = graine
   return () => {
@@ -30,8 +29,8 @@ function erreurDe(code: CodeErreur, confiance: number): Erreur {
   return {
     code,
     libelle: code,
-    ligne: 'une ligne de calcul',
-    explication: 'une explication courte',
+    ligne: 'a calculation line',
+    explication: 'a short explanation',
     confiance,
     ponderee: code !== 'E11' && code !== 'E99',
   }
@@ -52,7 +51,7 @@ function corpus(nbCopies: number, nbFautesParCopie: number, graine = 7): Diagnos
 }
 
 describe('crash test — volume', () => {
-  it('1 000 copies agrégées en moins d’une seconde, sans NaN', () => {
+  it('1,000 papers aggregated in under a second, without NaN', () => {
     const copies = corpus(1000, 4)
     const debut = Date.now()
     let profil: Profil = profilVide()
@@ -75,7 +74,7 @@ describe('crash test — volume', () => {
     expect(Math.abs(sommeParts - 1)).toBeLessThan(0.001)
   })
 
-  it('classement et phrase de synthèse restent bornés avec 1 000 copies', () => {
+  it('ranking and summary sentence stay bounded with 1,000 papers', () => {
     const copies = corpus(1000, 4)
     let profil = profilVide()
     for (const copie of copies) profil = agreger(profil, copie)
@@ -88,7 +87,7 @@ describe('crash test — volume', () => {
     expect(phrase).not.toContain('NaN')
   })
 
-  it('les exports ne grossissent pas avec l’historique (pas de fichier de 10 Mo)', () => {
+  it('exports do not grow with history (no 10 MB file)', () => {
     const copies = corpus(1000, 4)
     let profil = profilVide()
     for (const copie of copies) profil = agreger(profil, copie)
@@ -98,7 +97,7 @@ describe('crash test — volume', () => {
     expect(csv).not.toContain('NaN')
 
     const fiche = ficheEnMarkdown(profil, copies)
-    // La fiche liste les 5 dernières copies, pas les 1 000.
+    // The sheet lists the last 5 papers, not all 1,000.
     expect(fiche.split('\n').length).toBeLessThan(40)
     expect(fiche).not.toContain('NaN')
 
@@ -109,7 +108,7 @@ describe('crash test — volume', () => {
     expect(csvClasse).not.toContain('NaN')
   })
 
-  it('trajectoire sur 1 000 copies : série complète, tendance cohérente', () => {
+  it('trajectory over 1,000 papers: full series, consistent trend', () => {
     const copies = corpus(1000, 3)
     const serie = occurrencesParCopie(copies, 'E01')
     expect(serie).toHaveLength(1000)
@@ -118,7 +117,7 @@ describe('crash test — volume', () => {
     expect(pointsCourbe(serie)).toHaveLength(1000)
   })
 
-  it('mode prof : 200 copies d’un paquet, statistique exacte et rapide', () => {
+  it('teacher mode: batch of 200 papers, exact and fast statistic', () => {
     const copies = corpus(200, 5)
     const debut = Date.now()
     const stats = statsClasse(copies)
@@ -135,10 +134,10 @@ describe('crash test — volume', () => {
     expect(stats.pourcentageTypeFrequent).toBeLessThanOrEqual(100)
   })
 
-  it('un diagnostic géant (5 000 fautes brutes) ne casse ni le dominant ni l’agrégation', () => {
+  it('a huge diagnosis (5,000 raw errors) breaks neither dominant type nor aggregation', () => {
     const brutes = Array.from({ length: 5000 }, (_, index) => ({
       code: index % 3 === 0 ? 'E01' : index % 3 === 1 ? 'E04' : 'ZZZ',
-      ligne: `ligne ${index}`,
+      ligne: `line ${index}`,
       explication: 'x',
       confiance: 0.9,
     }))
@@ -151,7 +150,7 @@ describe('crash test — volume', () => {
     expect(profil.signalees.E99).toBeGreaterThan(0)
   })
 
-  it('valeurs extrêmes : aucune propagation de NaN ou d’Infinity', () => {
+  it('extreme values: no NaN or Infinity propagation', () => {
     const extremes = construireDiagnostic(
       [
         { code: 'E01', ligne: 'a', explication: 'b', confiance: Number.MAX_VALUE },

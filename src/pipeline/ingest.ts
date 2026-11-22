@@ -1,9 +1,9 @@
 /**
- * Étape 1 — Ingest : fichier photo → image normalisée (redimensionnée,
- * contraste étiré). Objectif < 300 ms et un poids d'envoi raisonnable.
+ * Step 1 — Ingest: photo file → normalized image (resized, contrast stretched).
+ * Target < 300 ms and a reasonable upload size.
  *
- * Aucune écriture disque, aucun envoi réseau ici : l'image vit en mémoire
- * jusqu'à l'étape d'extraction, puis est oubliée (RNF-P1).
+ * No disk write, no network send here: the image lives in memory until the
+ * extraction step, then is forgotten (RNF-P1).
  */
 import { LARGEUR_CIBLE_IMAGE, TAILLE_MAX_IMAGE_OCTETS } from '../domain/config'
 import { ErreurLLM } from './llm'
@@ -17,14 +17,14 @@ const TAILLE_MAX_MO = Math.round(TAILLE_MAX_IMAGE_OCTETS / (1024 * 1024))
 export function verifierTaille(octets: number): void {
   if (octets > TAILLE_MAX_IMAGE_OCTETS) {
     throw new ErreurLLM(
-      `Photo trop lourde (max ${TAILLE_MAX_MO} Mo). Reprends-la en qualité normale.`,
+      `Photo too large (max ${TAILLE_MAX_MO} MB). Retake it at normal quality.`,
       413,
     )
   }
-  if (octets === 0) throw new ErreurLLM('Fichier vide : choisis une photo de ta copie.', 400)
+  if (octets === 0) throw new ErreurLLM('Empty file: choose a photo of your paper.', 400)
 }
 
-/** Réduit la largeur à la cible en gardant les proportions (jamais d'agrandissement). */
+/** Reduces the width to the target while keeping proportions (never enlarges). */
 export function calculerDimensions(
   largeur: number,
   hauteur: number,
@@ -36,9 +36,9 @@ export function calculerDimensions(
 }
 
 /**
- * Étirement des niveaux sur la plage [bas, haut] des luminances (2 % / 98 %) :
- * une photo de copie prise au téléphone est souvent terne, ce qui noie le
- * crayon du professeur. Opération en place sur les pixels RGBA.
+ * Level stretching over the [low, high] luminance range (2% / 98%): a paper
+ * photo taken with a phone is often dull, which drowns out the teacher's
+ * pencil. In-place operation on the RGBA pixels.
  */
 export function etirerNiveaux(donnees: Uint8ClampedArray): void {
   const histogramme = new Uint32Array(256)
@@ -49,7 +49,7 @@ export function etirerNiveaux(donnees: Uint8ClampedArray): void {
   const total = donnees.length / 4
   const bas = percentile(histogramme, total, 0.02)
   const haut = percentile(histogramme, total, 0.98)
-  if (haut - bas < 16) return // image déjà contrastée ou uniforme : ne rien casser
+  if (haut - bas < 16) return // already contrasted or uniform image: break nothing
   const facteur = 255 / (haut - bas)
   for (let i = 0; i < donnees.length; i += 4) {
     donnees[i] = (donnees[i]! - bas) * facteur
@@ -58,7 +58,7 @@ export function etirerNiveaux(donnees: Uint8ClampedArray): void {
   }
 }
 
-/** Indice de luminance sous lequel se trouve la fraction `part` des pixels. */
+/** Luminance index below which the `part` fraction of pixels lies. */
 function percentile(histogramme: Uint32Array, total: number, part: number): number {
   const seuil = total * part
   let cumul = 0
@@ -73,7 +73,7 @@ async function chargerBitmap(fichier: File): Promise<ImageBitmap> {
   try {
     return await createImageBitmap(fichier)
   } catch {
-    throw new ErreurLLM('Image illisible : réessaie avec une photo JPG ou PNG.', 415)
+    throw new ErreurLLM('Unreadable image: try again with a JPG or PNG photo.', 415)
   }
 }
 
@@ -93,7 +93,7 @@ export async function normaliserImage(
   canvas.width = largeur
   canvas.height = hauteur
   const contexte = canvas.getContext('2d', { willReadFrequently: true })
-  if (!contexte) throw new ErreurLLM('Canvas indisponible dans ce navigateur.', 500)
+  if (!contexte) throw new ErreurLLM('Canvas unavailable in this browser.', 500)
 
   contexte.drawImage(bitmap, 0, 0, largeur, hauteur)
   bitmap.close()

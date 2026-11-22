@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
-"""Agent de périmètre Fireworks pour la file pr-auto-merge.
+"""Fireworks scope agent for the pr-auto-merge queue.
 
-Une PR dont le corps n'a pas de `## Scope`, ou dont la section ne couvre pas
-tous les fichiers modifiés, est refusée par `couche0` : le balayeur la voit
-`BLOCKED` et, sans ce script, la laisse pourrir — c'est exactement ce qui est
-arrivé aux PR d'auteur (Gaïa, 29/10).
+A PR whose body has no `## Scope`, or whose section does not cover all
+modified files, is refused by `couche0`: the sweeper sees it as `BLOCKED`
+and, without this script, leaves it to rot — exactly what happened to author
+PRs (Gaïa, 29/10).
 
-Ici un modèle Fireworks lit le diff et rédige une puce
-``- `chemin` — raison`` par fichier, en français. Le script vérifie le corps
-recomposé avec le garde de `main` lui-même (importé, jamais réécrit) avant
-de l'écrire : tout fichier non déclaré et toute déclaration inutile restent
-refusés. Ce n'est pas un contournement de `couche0`, c'est la déclaration
-manquante qui est écrite, avec une raison tirée du diff.
+Here a Fireworks model reads the diff and writes one bullet
+``- `path` — reason`` per file, in English. The script checks the recomposed
+body with `main`'s guard itself (imported, never rewritten) before writing
+it: any undeclared file and any useless declaration remain refused. This is
+not a bypass of `couche0`, it is the missing declaration that gets written,
+with a reason drawn from the diff.
 
-Bibliothèque standard uniquement. Usage :
+Standard library only. Usage:
 
   FIREWORKS_API_KEY=... python3 scope_agent.py fix \\
-      --repo GaiaSG94/errata --pr 215 --sha <tête> \\
+      --repo GaiaSG94/revision --pr 215 --sha <head> \\
       --guard /tmp/check_couche0.py
 
-Codes de sortie : 0 = corps complété ; 1 = échec avec compte rendu ;
-2 = rien à faire (conforme, autre contrôle rouge, déjà tenté, désactivé).
+Exit codes: 0 = body completed; 1 = failure with report;
+2 = nothing to do (compliant, another check red, already tried, disabled).
 """
 
 import argparse
@@ -39,9 +39,9 @@ MAX_FILES = 25
 MAX_EXCERPT_CHARS = 600
 MAX_EXCERPT_LINES = 5
 MAX_TOKENS = 3_000
-TEMPERATURE = 0.1
+TEMPEREVISION = 0.1
 CALL_TIMEOUT_S = 90
-COMMENT_PREFIX = "_fireworks · agent de périmètre (MiniMax M3.1 Flash)_"
+COMMENT_PREFIX = "_fireworks · scope agent (MiniMax M3.1 Flash)_"
 MARKER = "<!-- automerge-scope sha=%s -->"
 LABEL_HUMAN = "intervention-humaine"
 PUCE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+`?([^`\s]+)`?"
@@ -49,11 +49,11 @@ PUCE = re.compile(r"^\s*(?:[-*+]|\d+[.)])\s+`?([^`\s]+)`?"
 
 
 class AgentError(Exception):
-    """Échec avec message publiable (sans secret)."""
+    """Failure with a publishable message (no secret)."""
 
 
 class Skip(Exception):
-    """Rien à faire : l'appelant saute la PR sans bruit (exit 2)."""
+    """Nothing to do: the caller skips the PR silently (exit 2)."""
 
 
 def log(message):
@@ -61,8 +61,8 @@ def log(message):
 
 
 def env_or(name, default):
-    """Variable d'env ou défaut. GitHub injecte une var absente comme ""
-    (et non unset) : `os.environ.get(n, d)` rendrait "" → 400 Fireworks."""
+    """Env var or default. GitHub injects an absent var as ""
+    (not unset): `os.environ.get(n, d)` would return "" → 400 Fireworks."""
     return os.environ.get(name) or default
 
 
@@ -75,28 +75,28 @@ def sh(args, timeout=90):
 
 
 def comment(repo, pr, body):
-    """Commente la PR ; best-effort, ne lève jamais."""
+    """Comments on the PR; best-effort, never throws."""
     try:
         subprocess.run(["gh", "pr", "comment", str(pr), "--repo", repo,
                         "--body", COMMENT_PREFIX + "\n\n" + body],
                        capture_output=True, text=True, timeout=60)
     except Exception as exc:                                   # noqa: BLE001
-        log("commentaire impossible : %s" % exc)
+        log("comment impossible: %s" % exc)
 
 
 def add_label(repo, pr, label):
-    """Pose un label ; best-effort, ne lève jamais."""
+    """Sets a label; best-effort, never throws."""
     try:
         subprocess.run(["gh", "pr", "edit", str(pr), "--repo", repo,
                         "--add-label", label],
                        capture_output=True, text=True, timeout=60)
     except Exception as exc:                                   # noqa: BLE001
-        log("label %s impossible : %s" % (label, exc))
+        log("label %s impossible: %s" % (label, exc))
 
 
 def deja_tente(repo, pr, sha):
-    """Marqueur déjà posé pour cette tête ? (empreinte dans les commentaires,
-    pas sur le disque : les runners changent d'un passage à l'autre)."""
+    """Marker already set for this head? (fingerprint in comments,
+    not on disk: runners change from one pass to the next)."""
     try:
         out = sh(["gh", "pr", "view", str(pr), "--repo", repo,
                   "--json", "comments", "-q", ".comments[].body"])
@@ -106,7 +106,7 @@ def deja_tente(repo, pr, sha):
 
 
 def load_guard(path):
-    """Importe le garde de main, jamais une copie locale réécrite."""
+    """Imports main's guard, never a rewritten local copy."""
     spec = importlib.util.spec_from_file_location("couche0", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -114,7 +114,7 @@ def load_guard(path):
 
 
 def excerpt(fichier):
-    """Quelques lignes ajoutées : assez pour une raison, pas tout le diff."""
+    """A few added lines: enough for a reason, not the whole diff."""
     lignes = []
     for ligne in (fichier.get("patch") or "").splitlines():
         if ligne.startswith("+") and not ligne.startswith("+++"):
@@ -122,39 +122,39 @@ def excerpt(fichier):
         if len(lignes) >= MAX_EXCERPT_LINES:
             break
     texte = "\n".join(lignes)[:MAX_EXCERPT_CHARS]
-    return texte or "(binaire, renommage ou vidage)"
+    return texte or "(binary, rename or emptying)"
 
 
 def messages_pour(pr, fichiers, necessaires, relance=False):
     system = (
-        "Tu rédiges la section `## Scope` du corps d'une pull request : elle "
-        "déclare, fichier par fichier, ce que la PR change et pourquoi. "
-        "Pour CHAQUE fichier listé, rends exactement une ligne de la forme\n"
-        "- `chemin/exact` — raison en français, 12 mots maximum\n"
-        "Règles : reprends le chemin tel quel, sans glob ni dossier ; une "
-        "raison concrète tirée du diff (ce qui change, pas « modification du "
-        "fichier ») ; aucune ligne pour un fichier non listé ; aucun titre, "
-        "aucune phrase autour ; uniquement les puces, dans l'ordre donné.")
+        "You write the `## Scope` section of a pull request body: it "
+        "declares, file by file, what the PR changes and why. "
+        "For EACH listed file, return exactly one line of the form\n"
+        "- `exact/path` — reason in English, at most 12 words\n"
+        "Rules: copy the path as-is, no glob or folder; a "
+        "concrete reason drawn from the diff (what changes, not 'file "
+        "modification'); no line for an unlisted file; no title, "
+        "no surrounding sentence; only the bullets, in the given order.")
     if relance:
-        system += (" Relance : tu as omis certains fichiers. Donne une puce "
-                   "pour CHACUN, chemin complet recopié caractère par "
-                   "caractère, sans astérisque, sans raccourci, sans exception.")
-    blocs = ["Titre : %s" % pr["title"]]
+        system += (" Retry: you omitted some files. Give a bullet "
+                   "for EACH one, full path copied character by "
+                   "character, no asterisk, no shortcut, no exception.")
+    blocs = ["Title: %s" % pr["title"]]
     corps = (pr.get("body") or "").strip()
     if corps:
-        blocs.append("Corps actuel (extrait) :\n" + corps[:2_500])
+        blocs.append("Current body (excerpt):\n" + corps[:2_500])
     par_nom = {f["filename"]: f for f in fichiers}
     for chemin in necessaires:
         blocs.append("### %s\n%s" % (chemin, excerpt(par_nom[chemin])))
-    blocs.append("Rends une puce par fichier ci-dessus, rien d'autre.")
+    blocs.append("Return one bullet per file above, nothing else.")
     return [{"role": "system", "content": system},
             {"role": "user", "content": "\n\n".join(blocs)}]
 
 
 def fw_complete(api_url, key, model, messages):
-    """Un appel chat/completions Fireworks, rend le texte réponse."""
+    """One Fireworks chat/completions call, returns the response text."""
     payload = json.dumps({"model": model, "messages": messages,
-                          "temperature": TEMPERATURE,
+                          "temperevision": TEMPEREVISION,
                           "max_tokens": MAX_TOKENS}).encode("utf-8")
     req = urllib.request.Request(api_url, data=payload, method="POST")
     req.add_header("Authorization", "Bearer " + key)
@@ -163,16 +163,16 @@ def fw_complete(api_url, key, model, messages):
         with urllib.request.urlopen(req, timeout=CALL_TIMEOUT_S) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except Exception as exc:                                   # noqa: BLE001
-        raise AgentError("appel Fireworks : %s" % str(exc)[:200])
+        raise AgentError("Fireworks call: %s" % str(exc)[:200])
     try:
         return data["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError):
-        raise AgentError("réponse Fireworks illisible (pas de choices[0])")
+        raise AgentError("unreadable Fireworks response (no choices[0])")
 
 
 def raisons_repondue(texte):
-    """Puces du modèle → {motif: raison}, sans les blocs de code vides."""
-    balise = "think"                       # raisonnement interne éventuel
+    """Model bullets → {pattern: reason}, without empty code blocks."""
+    balise = "think"                       # possible internal reasoning
     texte = re.sub(r"<%s>.*?</%s>" % (balise, balise), "", texte, flags=re.S)
     raisons = {}
     for ligne in texte.splitlines():
@@ -189,12 +189,12 @@ def raisons_repondue(texte):
 
 
 def designe(motif, chemin, garde):
-    """Ce motif désigne-t-il ce fichier ? (règle du garde, puis souplesse)
+    """Does this pattern designate this file? (guard rule, then flexibility)
 
-    Le modèle rend un glob, un dossier, ou recopie le chemin avec une casse
-    approximative (`sam3Vision` pour `sam3vision`, vu sur #215 le 29/10). On
-    cherche le chemin exact, la règle du garde, puis l'égalité sans casse : le
-    fichier déclaré reste, lui, toujours écrit avec son vrai chemin.
+    The model returns a glob, a folder, or copies the path with approximate
+    casing (`sam3Vision` for `sam3vision`, seen on #215 on 29/10). We look
+    for the exact path, the guard rule, then case-insensitive equality: the
+    declared file is always written with its true path.
     """
     if motif == chemin or garde.matches(motif, chemin):
         return True
@@ -207,11 +207,11 @@ def designe(motif, chemin, garde):
 
 
 def rapprocher(raisons, necessaires, garde):
-    """Associe les puces rendues aux fichiers à déclarer.
+    """Matches the returned bullets to the files to declare.
 
-    Une puce juste ne doit jamais être comptée comme absente : c'est ce qui
-    laissait les PR bloquées sur « le modèle n'a rien rendu » (29/10, #215).
-    Rend (couverts {chemin: raison}, manquants).
+    A correct bullet must never be counted as absent: this is what left PRs
+    stuck on 'the model returned nothing' (29/10, #215).
+    Returns (covered {path: reason}, missing).
     """
     couverts = {}
     for chemin in necessaires:
@@ -224,20 +224,20 @@ def rapprocher(raisons, necessaires, garde):
 
 
 def motif_declare(ligne):
-    """Motif qu'un garde lit comme une déclaration dans `## Scope`.
+    """Pattern a guard reads as a declaration in `## Scope`.
 
-    Même expression que `parse_scope` : un garde lit `- `Parler`` même sans
-    raison, alors que `PUCE` (qui exige une raison) le prenait pour de la
-    prose. Ces lignes-là ne doivent pas survivre si elles ne servent aucun
-    fichier : le garde les compterait comme périmètre surdimensionné (#263).
+    Same expression as `parse_scope`: a guard reads `- `Parler`` even without
+    a reason, while `PUCE` (which requires one) took it for prose. Such lines
+    must not survive if they serve no file: the guard would count them as an
+    oversized scope (#263).
     """
     match = re.match(r"^\s*[-*]\s+`?([^`\s]+)`?", ligne)
     return match.group(1).strip().strip("`") if match else None
 
 
 def recomposer(corps, fichiers, raisons, garde):
-    """Corps recomposé : puces conservées si elles servent, manquantes ajoutées,
-    inutiles retirées. Rend (nouveau corps, ajouts, retraits)."""
+    """Recomposed body: useful bullets kept, missing ones added,
+    useless ones removed. Returns (new body, additions, removals)."""
     necessaires = [f["filename"] for f in fichiers
                    if not garde.is_exempt(f["filename"])]
     lignes = corps.splitlines()
@@ -256,7 +256,7 @@ def recomposer(corps, fichiers, raisons, garde):
         motif = motif_declare(ligne)
         if motif is None:
             if ligne.strip():
-                gardees.append(ligne)          # prose de l'auteur : intacte
+                gardees.append(ligne)          # author's prose: untouched
             continue
         servis = [chemin for chemin in necessaires
                   if designe(motif, chemin, garde)]
@@ -280,23 +280,23 @@ def ecrire_corps(repo, pr, corps):
 
 
 def verifier_reglages():
-    """Clés et coupe-circuit ; lève Skip si l'agent doit se taire."""
+    """Keys and circuit breaker; raises Skip if the agent must stay silent."""
     key = env_or("FIREWORKS_API_KEY", "")
     if env_or("FIREWORKS_AGENT_SCOPE", "1") == "0":
-        raise Skip("agent de périmètre coupé (FIREWORKS_AGENT_SCOPE=0)")
+        raise Skip("scope agent disabled (FIREWORKS_AGENT_SCOPE=0)")
     if not key:
-        raise Skip("FIREWORKS_API_KEY absent : périmètre laissé à l'auteur")
+        raise Skip("FIREWORKS_API_KEY missing: scope left to the author")
     return (key, env_or("FIREWORKS_MODEL", MODEL_DEFAULT),
             env_or("FIREWORKS_BASE_URL", API_DEFAULT))
 
 
 def contexte(args, garde):
-    """Corps, fichiers de la PR et fichiers à déclarer. Lève Skip si le garde
-    est rouge pour autre chose que le périmètre : on ne réécrit pas un corps
-    pour un échec que la réécriture ne corrige pas."""
+    """Body, PR files and files to declare. Raises Skip if the guard is red
+    for something other than scope: we do not rewrite a body for a failure
+    that rewriting would not fix."""
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN") or ""
     if not token:
-        raise AgentError("aucun jeton GitHub dans l'environnement")
+        raise AgentError("no GitHub token in the environment")
     try:
         corps, fichiers = garde.pr_context(args.repo, args.pr, token)
     except Exception as exc:                                   # noqa: BLE001
@@ -304,17 +304,17 @@ def contexte(args, garde):
     erreurs = []
     garde.check_scope(fichiers, corps, erreurs)
     if not erreurs:
-        raise Skip("périmètre déjà conforme")
+        raise Skip("scope already compliant")
     autres = [e for e in erreurs if not e.startswith("scope")]
     if autres:
-        raise Skip("couche0 rouge sur autre chose que le périmètre : %s"
+        raise Skip("couche0 red for something other than scope: %s"
                    % " ; ".join(autres)[:300])
     necessaires = [f["filename"] for f in fichiers
                    if not garde.is_exempt(f["filename"])]
     if not necessaires:
-        raise Skip("aucun fichier à déclarer")
+        raise Skip("no file to declare")
     if len(necessaires) > MAX_FILES:
-        raise Skip("%d fichiers (plafond %d) : main humaine"
+        raise Skip("%d files (cap %d): human hand"
                    % (len(necessaires), MAX_FILES))
     return corps, fichiers, necessaires
 
@@ -325,15 +325,15 @@ def titre_pr(repo, pr):
 
 
 def rendre_compte(args, ajouts, retires):
-    """Commentaire unique : ce qui a été écrit, et la marque par tête."""
-    lignes = ["Périmètre complété depuis le diff : **%d fichier(s)** déclaré(s)."
+    """Single comment: what was written, and the per-head marker."""
+    lignes = ["Scope completed from the diff: **%d file(s)** declared."
               % len(ajouts)]
     if retires:
-        lignes.append("Déclaration(s) sans fichier correspondant retirée(s) : %s."
+        lignes.append("Declaration(s) with no matching file removed: %s."
                       % ", ".join("`%s`" % m for m in retires))
-    lignes.append("Vérifié avec le garde de `main` avant écriture : tout fichier "
-                  "touché est déclaré, aucune déclaration inutile. `couche0` rejuge "
-                  "sur ce nouveau corps.")
+    lignes.append("Verified with `main`'s guard before writing: every touched "
+                  "file is declared, no useless declaration. `couche0` re-judges "
+                  "on this new body.")
     lignes.append(MARKER % args.sha)
     comment(args.repo, args.pr, "\n\n".join(lignes))
 
@@ -341,7 +341,7 @@ def rendre_compte(args, ajouts, retires):
 def cmd_fix(args):
     key, model, api_url = verifier_reglages()
     if deja_tente(args.repo, args.pr, args.sha):
-        raise Skip("périmètre déjà tenté pour cette tête")
+        raise Skip("scope already tried for this head")
     garde = load_guard(args.guard)
     corps, fichiers, necessaires = contexte(args, garde)
     titre = titre_pr(args.repo, args.pr)
@@ -351,15 +351,15 @@ def cmd_fix(args):
         print("===== prompt =====")
         print(messages[1]["content"][:6_000])
         return 0
-    log("rédaction du périmètre (%d fichiers)" % len(necessaires))
+    log("writing scope (%d files)" % len(necessaires))
     texte = fw_complete(api_url, key, model,
                         messages_pour({"title": titre, "body": corps},
                                       fichiers, necessaires))
     couverts, manquants = rapprocher(raisons_repondue(texte), necessaires, garde)
     if manquants:
-        # Relance ciblée : les fichiers oubliés, seuls, avec le diff sous les
-        # yeux. Une omission du modèle ne doit pas coûter la PR.
-        log("relance ciblée : %d fichier(s) sans puce" % len(manquants))
+        # Targeted retry: the forgotten files only, with the diff at hand.
+        # A model omission must not cost the PR.
+        log("targeted retry: %d file(s) without a bullet" % len(manquants))
         texte2 = fw_complete(api_url, key, model,
                              messages_pour({"title": titre, "body": corps},
                                            fichiers, manquants, relance=True))
@@ -367,28 +367,28 @@ def cmd_fix(args):
         couverts.update(trouves)
     if manquants:
         apercu = " ".join((texte or "").split())[:200]
-        log("réponse du modèle : %s" % (apercu or "(vide)"))
-        raise AgentError("le modèle n'a rien rendu pour : %s"
+        log("model response: %s" % (apercu or "(empty)"))
+        raise AgentError("the model returned nothing for: %s"
                          % ", ".join(manquants)[:300])
     nouveau, ajouts, retires = recomposer(corps, fichiers, couverts, garde)
     verif = []
     garde.check_scope(fichiers, nouveau, verif)
     if verif:
-        raise AgentError("le garde refuse encore le corps recomposé : %s"
+        raise AgentError("the guard still refuses the recomposed body: %s"
                          % " ; ".join(verif)[:300])
     ecrire_corps(args.repo, args.pr, nouveau)
     rendre_compte(args, ajouts, retires)
-    log("corps réécrit (%d ajout(s), %d retrait(s))" % (len(ajouts), len(retires)))
+    log("body rewritten (%d addition(s), %d removal(s))" % (len(ajouts), len(retires)))
     return 0
 
 
 def fail(repo, pr, sha, raison):
-    """Compte rendu d'échec : une fois par tête, jamais de boucle."""
-    comment(repo, pr, "Périmètre **non complété** : %s\n\n"
-                      "À l'auteur de déclarer `## Scope`.\n\n%s"
+    """Failure report: once per head, never a loop."""
+    comment(repo, pr, "Scope **not completed**: %s\n\n"
+                      "Author must declare `## Scope`.\n\n%s"
                       % (raison, MARKER % sha))
     add_label(repo, pr, LABEL_HUMAN)
-    log("échec : %s" % raison)
+    log("failure: %s" % raison)
     return 1
 
 
@@ -399,7 +399,7 @@ def main(argv=None):
     ap.add_argument("--pr", required=True)
     ap.add_argument("--sha", required=True)
     ap.add_argument("--guard", required=True,
-                    help="chemin du check_couche0.py téléchargé depuis main")
+                    help="path to check_couche0.py downloaded from main")
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args(argv)
     try:

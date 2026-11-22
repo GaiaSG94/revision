@@ -21,10 +21,10 @@ function distanceTouches(evenement: ReactTouchEvent): number | null {
 }
 
 /**
- * La copie annotée, interactive : cliquer une faute zoome dessus, cliquer une
- * zone sur l'image sélectionne la faute dans la liste. Molette et double-clic
- * sur desktop, pincement à deux doigts sur mobile. Le cadre borne la vue :
- * l'image ne sort jamais de l'écran.
+ * The annotated paper, interactive: clicking an error zooms in on it, clicking
+ * a zone on the image selects the error in the list. Mouse wheel and
+ * double-click on desktop, two-finger pinch on mobile. The frame bounds the
+ * view: the image never leaves the screen.
  */
 export function CopieAnnotee({ src, alt, erreurs, selection, onSelect }: Props) {
   const [vue, setVue] = useState<Vue>(reinitialiser)

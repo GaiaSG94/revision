@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Tests ciblés de quota.py — bibliothèque standard uniquement.
+"""Targeted tests for quota.py — standard library only.
 
-Lance : python3 -m unittest test_quota -v
-(depuis .github/fireworks/).
+Run: python3 -m unittest test_quota -v
+(from .github/fireworks/).
 """
 import os
 import shutil
@@ -15,12 +15,12 @@ import quota
 
 
 class SaisinesParPrTest(unittest.TestCase):
-    """Une PR ne peut pas consommer tout le plafond horaire à elle seule."""
+    """A PR cannot consume the whole hourly cap on its own."""
 
     def test_compte_par_pr_et_par_fenetre(self):
         home = tempfile.mkdtemp(prefix="fw-home-")
         self.addCleanup(shutil.rmtree, home, True)
-        with mock.patch.dict(os.environ, {"HOME": home}):
+        with mock.patch.dict(os.environ, {"HOME": home, "USERPROFILE": home}):
             cache = quota.cache_dir()
             os.makedirs(cache, exist_ok=True)
             for pr, sha in (("215", "a" * 12), ("215", "b" * 12),
@@ -39,7 +39,7 @@ class SaisinesParPrTest(unittest.TestCase):
     def test_plafond_par_pr_leve_skip(self):
         home = tempfile.mkdtemp(prefix="fw-home-")
         self.addCleanup(shutil.rmtree, home, True)
-        with mock.patch.dict(os.environ, {"HOME": home}):
+        with mock.patch.dict(os.environ, {"HOME": home, "USERPROFILE": home}):
             cache = quota.cache_dir()
             os.makedirs(cache, exist_ok=True)
             for i in range(quota.SAISINES_PR_MAX):

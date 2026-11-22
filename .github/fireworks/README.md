@@ -1,106 +1,94 @@
-# Agents Fireworks
+# Fireworks agents
 
-Deux agents, deux problèmes distincts, jamais une porte de merge : seule la CI
-verte fait merger. Tous deux sont lus sur `origin/main` par le sweep (la
-branche d'une PR peut être antérieure), et n'écrivent que du texte ou des puces
-vérifiées.
+Two agents, two distinct problems, never a merge gate: only green CI merges. Both are read from
+`origin/main` by the sweep (a PR branch may be behind), and they only write text or verified
+bullets.
 
-## Agent de conflit (`conflict_agent.py`)
+## Conflict agent (`conflict_agent.py`)
 
-Quand le sweep de `pr-auto-merge` échoue à rebaser une PR, il appelle
-`conflict_agent.py` dans son clone, rebase en cours. L'agent demande au modèle
-Fireworks la résolution de chaque fichier en conflit, termine le rebase, pousse
-sur la branche de la PR avec bail et rend compte en commentaire. La file reprend
-au passage suivant ; seule la CI verte fait merger.
+When the `pr-auto-merge` sweep fails to rebase a PR, it calls `conflict_agent.py` in its clone,
+with the rebase in progress. The agent asks the model for a resolution for each conflicting file,
+finishes the rebase, pushes to the PR branch with a lease and reports in a comment. The queue picks
+up at the next pass; only green CI merges.
 
-Les journaux en ajout pur (`CHANGELOG.md`, `CHANGELOG`) ne passent jamais par le
-modèle : deux entrées écrites en tête de fichier ne sont pas un désaccord, elles
-sont réunies sans perte (`union_journal.py`, `union_sans_perte`). Un bloc qui
-remplacerait une ligne commune, lui, reste au modèle. C'est ce qui a arrêté la
-boucle du 29/10 (#215 rebasée six fois sur `CHANGELOG.md`, une saisine et un
-quota par rebase). Les empreintes et plafonds vivent dans `quota.py`.
+Append-only logs (`CHANGELOG.md`, `CHANGELOG`) never go through the model: two entries written at
+the top of a file are not a disagreement, they are merged losslessly (`union_journal.py`,
+`union_sans_perte`). A block that would replace a common line, on the other hand, stays with the
+model. This is what stopped the loop of 29 October (#215 rebased six times on `CHANGELOG.md`, one
+invocation and one quota charge per rebase). Fingerprints and caps live in `quota.py`.
 
-Les deux modules sont chargés par `conflict_agent.py` depuis `origin/main`
-(import direct d'abord) : le sweep ne copie que le script d'agent dans `/tmp`,
-et une branche de PR peut être antérieure à ce découpage.
+Both modules are loaded by `conflict_agent.py` from `origin/main` (direct import first): the sweep
+only copies the agent script to `/tmp`, and a PR branch may predate that split.
 
-## Contrat d'appel
+## Call contract
 
 ```bash
 FIREWORKS_API_KEY=... python3 conflict_agent.py resolve \
-  --repo GaiaSG94/errata --pr 118 --branch feat/x --sha <tête>
+  --repo GaiaSG94/revision --pr 118 --branch feat/x --sha <head>
 ```
 
-Le script est lu sur `origin/main` (pas sur la branche de la PR, qui peut
-être antérieure). Sorties : `0` poussé, `1` échec avec compte rendu,
-`2` rien à faire (l'appelant saute sans bruit).
+The script is read from `origin/main` (not the PR branch, which may be behind). Exit codes: `0`
+pushed, `1` failure with a report, `2` nothing to do (the caller skips silently).
 
-## Réglages
+## Settings
 
-| Variable / secret | Défaut | Effet |
+| Variable / secret | Default | Effect |
 |---|---|---|
-| secret `FIREWORKS_API_KEY` | — | sans lui, l'agent ne fait rien |
-| var `FIREWORKS_MODEL` | `accounts/fireworks/models/minimax-m3p1-flash` | modèle interrogé |
-| var `FIREWORKS_BASE_URL` | `https://api.fireworks.ai/inference/v1/chat/completions` | point d'API |
-| var `FIREWORKS_AGENT_RESOLVE` | `1` | `0` coupe l'agent sans toucher au code |
+| secret `FIREWORKS_API_KEY` | — | without it, the agent does nothing |
+| var `FIREWORKS_MODEL` | `accounts/fireworks/models/minimax-m3p1-flash` | model queried |
+| var `FIREWORKS_BASE_URL` | `https://api.fireworks.ai/inference/v1/chat/completions` | API endpoint |
+| var `FIREWORKS_AGENT_RESOLVE` | `1` | `0` disables the agent without touching code |
 
-## Garde-fous
+## Guardrails
 
-Empreinte par tête de PR + cooldown 20 min, plafond 10 saisines/heure (`SPAWN_CAP`)
-et 3 saisines par PR en 30 min (`SAISINES_PR_MAX` : une PR ne peut pas brûler
-tout le quota horaire à elle seule), 100 fichiers max, refus des conflits sous
-`.github/`, des binaires et des fichiers de plus de 200 Ko, budget 240 s, push
-avec bail uniquement. Le dry-run ne consomme ni empreinte ni quota, et l'union
-déterministe des journaux ne consomme rien du tout.
-Labels `hold` / `intervention-humaine` : main humaine, aucune saisine.
-Succès : label `agent-conflit`. Le modèle ne voit que les bords du conflit,
-jamais aucun secret.
+Fingerprint per PR head + 20 min cooldown, cap of 10 invocations/hour (`SPAWN_CAP`) and 3
+invocations per PR in 30 min (`SAISINES_PR_MAX`: one PR cannot burn the whole hourly quota on its
+own), 100 files max, refusal of conflicts under `.github/`, binaries and files over 200 KB, 240 s
+budget, lease-only push. Dry run consumes neither fingerprint nor quota, and deterministic journal
+unions consume nothing at all.
+Labels `hold` / `intervention-humaine`: human hand-off, no invocation. Success: label
+`agent-conflit`. The model only sees the edges of the conflict, never any secret.
 
-Recette : `python3 conflict_agent.py resolve --dry-run --repo GaiaSG94/errata
---pr N` affiche les prompts sans rien appeler (dans un clone en conflit).
+Recipe: `python3 conflict_agent.py resolve --dry-run --repo GaiaSG94/revision
+--pr N` prints the prompts without calling anything (in a clone with a conflict).
 
-## Agent de périmètre (`scope_agent.py`)
+## Scope agent (`scope_agent.py`)
 
-Une PR dont le corps n'a pas de `## Scope` (ou dont la section ne couvre pas tous
-les fichiers modifiés) est refusée par `couche0`, donc vue `BLOCKED` par le
-balayeur. L'agent lit le diff, rédige une puce ``- `chemin` — raison`` par
-fichier en français, puis **rejoue `check_scope` du garde de `main`** sur le
-corps recomposé avant d'écrire : fichier non déclaré et déclaration inutile
-restent refusés. Ce n'est pas un contournement du garde, c'est la déclaration
-manquante qui est écrite.
+A PR whose body has no `## Scope` (or whose section does not cover every changed file) is rejected
+by `couche0`, so the sweep sees it as `BLOCKED`. The agent reads the diff, writes one
+``- `path` — reason`` bullet per file in French, then **replays the `main` guard's `check_scope`**
+on the recomposed body before writing: an undeclared file and a useless declaration both remain
+rejected. This is not a guard bypass, it is writing the missing declaration.
 
 ```bash
 FIREWORKS_API_KEY=... python3 scope_agent.py fix \
-  --repo GaiaSG94/errata --pr 215 --sha <tête> --guard /tmp/check_couche0.py
+  --repo GaiaSG94/revision --pr 215 --sha <head> --guard /tmp/check_couche0.py
 ```
 
-Sorties : `0` corps complété (un commentaire porte le marqueur `automerge-scope`
-avec la tête, donc une seule tentative par commit), `1` échec avec compte rendu,
-`2` rien à faire. Réglages : `FIREWORKS_MODEL` / `FIREWORKS_BASE_URL` comme
-l'agent de conflit, `FIREWORKS_AGENT_SCOPE=0` pour couper. Plafond 25 fichiers ;
-au-delà, label `intervention-humaine` et main humaine.
+Exit codes: `0` body completed (a comment carries the `automerge-scope` marker with the head, so
+there is only one attempt per commit), `1` failure with a report, `2` nothing to do. Settings:
+`FIREWORKS_MODEL` / `FIREWORKS_BASE_URL` as for the conflict agent, `FIREWORKS_AGENT_SCOPE=0` to
+disable. Cap of 25 files; beyond that, label `intervention-humaine` and human hand-off.
 
-Une puce rendue sous forme de glob ou de dossier (`app/**/Settings*.kt`,
-`docs/`) est rapprochée du fichier avec la **règle du garde** (`matches`), pas
-par égalité de chaîne : le 29/10, un glob juste était compté comme absent et la
-PR restait bloquée sur « le modèle n'a rien rendu ». Si des fichiers manquent
-encore, une **relance ciblée** ne redemande qu'eux, avec leur diff ; la réponse
-du modèle est journalisée au moindre échec.
+A bullet written as a glob or a folder (`app/**/Settings*.kt`, `docs/`) is matched to the file
+using the **guard's rule** (`matches`), not string equality: on 1 November, a correct glob was
+counted as absent and the PR stayed blocked on "the model returned nothing". If files are still
+missing, a **targeted retry** asks only for them, with their diff; the model's answer is logged on
+any failure.
 
-## Indice de triage (`--indice`)
+## Triage index (`--indice`)
 
-Depuis le 01/11, l'agent ne part plus du seul journal. Le workflow
-`triage-rouge` relance la classe tombée seule et écrit son verdict dans
-`/tmp/triage.txt` (classe, périmètre, suspects) ; `test_agent.py fix --indice
-/tmp/triage.txt` l'ajoute au prompt, sous « Triage automatique (déjà fait, ne le
-refais pas) ».
+Since 1 November, the agent no longer starts from the log alone. The `triage-rouge` workflow
+re-runs the class that failed alone and writes its verdict to `/tmp/triage.txt` (class, scope,
+suspects); `test_agent.py fix --indice /tmp/triage.txt` adds it to the prompt, under "Automatic
+triage (already done, do not redo it)".
 
-C'est ce qui manquait sur #919 : la classe tombée n'était pas dans le diff, le
-coupable était le nouveau test de la PR (globaux de séance sales), et l'agent —
-lancé sans indice — a rendu « budget de 150 s dépassé », deux fois.
+That is what was missing on #919: the failing class was not in the diff, the culprit was the PR's
+new test (dirty session globals), and the agent — run without an index — returned "150 s budget
+exceeded", twice.
 
-Sans `--indice`, le comportement est celui d'avant (journal seul). L'option est
-facultative et ne casse aucun appelant : le balayeur peut la passer aussi.
+Without `--indice`, behaviour is as before (log only). The option is optional and breaks no caller:
+the sweep can pass it too.
 
 ## Validation
 

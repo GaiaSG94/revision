@@ -22,19 +22,19 @@ function diagnosticAvec(erreurs: { code: string; ponderee?: boolean }[]): Diagno
 
 const MOTS_CULPABILISANTS = ["tu t'es trompé", 'nul', 'grave', 'honte', 'incapable']
 
-describe('trajectoire du profil (lot 5)', () => {
-  it('série vide ou d’une copie → tendance inconnue', () => {
+describe('profile trajectory (batch 5)', () => {
+  it('empty or single-paper series → unknown trend', () => {
     expect(tendance([])).toBe('inconnue')
     expect(tendance([3])).toBe('inconnue')
   })
 
-  it('baisse, hausse et stable sont reconnues', () => {
+  it('decrease, increase and stable are recognized', () => {
     expect(tendance([3, 2, 1, 0])).toBe('baisse')
     expect(tendance([0, 1, 2])).toBe('hausse')
     expect(tendance([2, 2, 2])).toBe('stable')
   })
 
-  it('E11 et E99 ne comptent pas dans la série pondérée', () => {
+  it('E11 and E99 do not count in the weighted series', () => {
     const diagnostic = diagnosticAvec([
       { code: 'E01' },
       { code: 'E11' },
@@ -45,15 +45,15 @@ describe('trajectoire du profil (lot 5)', () => {
     expect(occurrencesParCopie([diagnostic], 'E99')).toEqual([0])
   })
 
-  it('failleDisparue exige au moins 4 copies et une disparition réelle', () => {
+  it('failleDisparue requires at least 4 papers and a real disappearance', () => {
     const ancien = [diagnosticAvec([{ code: 'E04' }]), diagnosticAvec([{ code: 'E04' }])]
     const recentes = [diagnosticAvec([{ code: 'E01' }]), diagnosticAvec([]), diagnosticAvec([{ code: 'E01' }])]
     expect(failleDisparue([...ancien, ...recentes], 'E04')).toBe(true)
-    expect(failleDisparue(ancien, 'E04')).toBe(false) // seulement 2 copies
-    expect(failleDisparue([...ancien, ...recentes], 'E01')).toBe(false) // E01 encore présent
+    expect(failleDisparue(ancien, 'E04')).toBe(false) // only 2 papers
+    expect(failleDisparue([...ancien, ...recentes], 'E01')).toBe(false) // E01 still present
   })
 
-  it('messageProgression reste bienveillant et cite le type dominant', () => {
+  it('messageProgression stays caring and cites the dominant type', () => {
     const diagnostics = [
       diagnosticAvec([{ code: 'E01' }, { code: 'E01' }]),
       diagnosticAvec([{ code: 'E01' }]),
@@ -66,12 +66,12 @@ describe('trajectoire du profil (lot 5)', () => {
     for (const mot of MOTS_CULPABILISANTS) expect(message.toLowerCase()).not.toContain(mot)
   })
 
-  it('profil vide → message d’invitation, codesATracer vide', () => {
+  it('empty profile → invitation message, empty codesATracer', () => {
     expect(messageProgression(profilVide(), [])).toContain('trajectory')
     expect(codesATracer(profilVide())).toEqual([])
   })
 
-  it('codesATracer renvoie les 3 plus fréquents, pointsCourbe indexe', () => {
+  it('codesATracer returns the 3 most frequent, pointsCourbe indexes', () => {
     const diagnostics = [
       diagnosticAvec([{ code: 'E01' }, { code: 'E01' }, { code: 'E04' }, { code: 'E06' }]),
     ]

@@ -1,4 +1,4 @@
-<!-- v2 — sortie bornée, 12/11 -->
+<!-- v2 — bounded output -->
 
 # Prompt — Single-pass analysis (annotations + typing)
 

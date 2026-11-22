@@ -1,10 +1,10 @@
 /**
- * Quota du proxy — logique pure, aucune dépendance, aucun I/O.
+ * Proxy quota — pure logic, no dependency, no I/O.
  *
- * Deux plafonds : par visiteur sur une heure glissante, et un plafond global
- * par jour (le tier gratuit d'InferHub est partagé). Tout est en mémoire :
- * un redémarrage remet les compteurs à zéro, ce qui est acceptable pour un
- * garde-fou de démonstration et évite tout stockage côté serveur (RNF-P1).
+ * Two caps: per visitor over a sliding hour, and a global daily cap (InferHub's
+ * free tier is shared). Everything is in memory: a restart resets the counters,
+ * which is acceptable for a demo safeguard and avoids any server-side storage
+ * (RNF-P1).
  */
 
 export type OptionsQuota = {
@@ -15,9 +15,9 @@ export type OptionsQuota = {
 }
 
 export type Quota = {
-  /** Consomme une unité si possible : true = autorisé. */
+  /** Consumes one unit if possible: true = allowed. */
   autoriser: (id: string, maintenant: number) => boolean
-  /** Nombre d'appels restants pour cet id, sans consommer. */
+  /** Number of calls remaining for this id, without consuming. */
   restant: (id: string, maintenant: number) => number
 }
 

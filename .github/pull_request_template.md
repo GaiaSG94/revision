@@ -1,21 +1,21 @@
 ## Scope
 
-<!-- Le gate `couche0` exige des puces qui énumèrent EXACTEMENT les fichiers
-touchés par la PR (chemins relatifs, sans backticks obligatoires mais lisibles).
-Une puce en trop ou en moins = périmètre refusé. -->
+<!-- The `couche0` gate requires bullets that list EXACTLY the files touched by the PR
+(relative paths; backticks are optional but recommended for readability).
+One bullet too many or too few = scope rejected. -->
 
-- `chemin/du/fichier1.ts`
-- `chemin/du/fichier2.ts`
+- `path/to/file1.ts`
+- `path/to/file2.ts`
 
-## Pourquoi
+## Why
 
-<!-- Une phrase : le problème ou la valeur ajoutée. -->
+<!-- One sentence: the problem or the value added. -->
 
-## Comment vérifier
+## How to verify
 
 - [ ] `npm run typecheck`
 - [ ] `npm test`
 - [ ] `npm run build`
 
-<!-- Rappel : CI budget 5 min, trois checks requis (ci, ci-budget, couche0),
-merge par la file Mergify uniquement. Jamais de push direct sur main. -->
+<!-- Reminder: 5 min CI budget, three required checks (ci, ci-budget, couche0),
+merge through the Mergify queue only. Never push directly to main. -->

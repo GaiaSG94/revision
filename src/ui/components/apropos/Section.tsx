@@ -3,8 +3,9 @@ import type { ReactNode } from 'react'
 type Props = { id: string; titre: string; children: ReactNode }
 
 /**
- * Une section de l'écran « Comment ça marche » : ancre de sommaire + titre +
- * contenu. `scroll-mt` évite que le titre passe sous l'en-tête au clic.
+ * A section of the "How it works" screen: table-of-contents anchor + title +
+ * content. `scroll-mt` prevents the title from hiding under the header when
+ * clicked.
  */
 export function Section({ id, titre, children }: Props) {
   return (

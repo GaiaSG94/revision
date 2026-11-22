@@ -5,7 +5,7 @@ import time
 import urllib.error
 import urllib.request
 
-PROXY = "https://errata-proxy.rature.workers.dev/analyze"
+PROXY = "https://revision-proxy.workers.dev/analyze"
 IMAGE = sys.argv[1] if len(sys.argv) > 1 else "corpus/demo/copie-demo-1.jpg"
 MODELE = sys.argv[2] if len(sys.argv) > 2 else "ag/gemini-4-carbon"
 
@@ -28,11 +28,11 @@ charge = {
                 {
                     "type": "text",
                     "text": (
-                        "Voici la copie d'un eleve, corrigee par son professeur. "
-                        "Les annotations du professeur sont en rouge. "
-                        "Repere chaque faute de l'eleve et indique son type "
-                        "parmi E01 a E12, puis la plus grave. "
-                        "Reponds en JSON : {\"fautes\":[{\"code\":\"E01\","
+                        "Here is a student's paper, corrected by their teacher. "
+                        "The teacher's annotations are in red. "
+                        "Identify each mistake and give its type "
+                        "from E01 to E12, then the most serious one. "
+                        "Answer in JSON: {\"fautes\":[{\"code\":\"E01\","
                         "\"description\":\"...\",\"confiance\":0.9}]}."
                     ),
                 },
@@ -51,9 +51,9 @@ except urllib.error.HTTPError as e:
     print("HTTP", e.code, e.read().decode()[:300])
     sys.exit(1)
 
-print("duree: %.1f s" % (time.time() - debut))
-print("modele:", corps.get("modele"))
-print("cles:", sorted(corps.keys()))
+print("duration: %.1f s" % (time.time() - debut))
+print("model:", corps.get("modele"))
+print("keys:", sorted(corps.keys()))
 texte = corps.get("texte", "")
-print("texte (600 premiers caracteres):")
+print("text (first 600 characters):")
 print(texte[:600])

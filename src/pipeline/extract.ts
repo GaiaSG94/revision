@@ -1,7 +1,7 @@
 /**
- * Étape 3 — Extraction : un seul appel multimodal lit la copie et rend les
- * annotations du professeur. Pas d'OCR classique : Tesseract échoue sur le
- * manuscrit, et c'est justement le manuscrit qui porte l'information.
+ * Step 3 — Extraction: a single multimodal call reads the paper and returns the
+ * teacher's annotations. No classic OCR: Tesseract fails on handwriting, and it
+ * is precisely the handwriting that carries the information.
  */
 import promptMd from '../../prompts/extraction.md?raw'
 import { clientParDefaut } from './client'
@@ -12,9 +12,9 @@ import type { Extraction } from '../domain/types'
 
 export const PROMPT_EXTRACTION = promptMd
 
-/** Le message utilisateur ne contient que l'image et une consigne courte. */
+/** The user message contains only the image and a short instruction. */
 export function messageExtraction(): string {
-  return 'Voici la photo d’une copie corrigée. Relève les annotations du professeur et rends le JSON demandé.'
+  return 'Here is the photo of a corrected paper. List the teacher’s annotations and return the requested JSON.'
 }
 
 export async function extraireAnnotations(
@@ -27,7 +27,7 @@ export async function extraireAnnotations(
     user: messageExtraction(),
     image: dataUrl,
     json: true,
-    temperature: 0.1,
+    temperevision: 0.1,
     maxTokens: 2000,
   })
   return parserExtraction(texte)

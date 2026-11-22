@@ -1,47 +1,47 @@
 import { Section } from './Section'
 import { SECTIONS } from './catalogue'
 
-/** RNF-P1 à P5 (docs/ARCHITECTURE.md), traduites en langage clair. */
+/** RNF-P1 to P5 (docs/ARCHITECTURE.md), translated into plain language. */
 const REGLES: { ref: string; titre: string; texte: string }[] = [
   {
     ref: 'RNF-P1',
-    titre: 'Ta copie n’est jamais enregistrée',
+    titre: 'Your paper is never saved',
     texte:
-      'l’image vit en mémoire le temps de l’analyse, puis disparaît. Elle n’est écrite ni dans ton navigateur, ni sur un serveur.',
+      'the image lives in memory during the analysis, then disappears. It is written neither in your browser nor on a server.',
   },
   {
     ref: 'RNF-P2',
-    titre: 'Ton nom est masqué avant tout le reste',
+    titre: 'Your name is masked before anything else',
     texte:
-      'dès l’étape 2, le bandeau d’en-tête est pixelisé : ni l’écran, ni le modèle, ni le proxy ne voient l’identité de l’élève.',
+      'from step 2, the header banner is pixelated: neither the screen, nor the model, nor the proxy can see the student\u2019s identity.',
   },
   {
     ref: 'RNF-P3',
-    titre: 'Le proxy ne lit pas ta copie',
+    titre: 'The proxy does not read your paper',
     texte:
-      'il garde la clé d’API côté serveur et ne journalise que l’horodatage, le code HTTP et la latence — aucun contenu.',
+      'it keeps the API key server-side and logs only the timestamp, the HTTP status code and the latency — no content.',
   },
   {
     ref: 'RNF-P4',
-    titre: 'Ton historique t’appartient',
+    titre: 'Your history belongs to you',
     texte:
-      'il reste en local (IndexedDB) sur cet appareil, sans compte ni base de données ; tu peux l’exporter et tout supprimer depuis l’écran Réglages.',
+      'it stays local (IndexedDB) on this device, with no account or database; you can export it and delete everything from the Settings screen.',
   },
   {
     ref: 'RNF-P5',
-    titre: 'On l’écrit, on ne le suppose pas',
+    titre: 'We write it, we do not assume it',
     texte:
-      'la mention « aucune copie n’est conservée » est affichée dans l’interface : accueil, cadrage, réglages et pied de page.',
+      'the mention "no paper is ever stored" is displayed in the interface: home, framing, settings and footer.',
   },
 ]
 
-/** Section 4 : les cinq règles de confidentialité, tenues dans le code. */
+/** Section 4: the five privacy rules, enforced in the code. */
 export function SectionConfidentialite() {
   return (
     <Section {...SECTIONS.confidentialite}>
       <p className="text-sm text-muet">
-        Aucun backend de données : pas de base, pas d’authentification, pas d’analyse côté serveur.
-        Voici les cinq exigences du cahier des charges et ce qu’elles veulent dire pour toi.
+        No data backend: no database, no authentication, no server-side analysis.
+        Here are the five requirements from the spec and what they mean for you.
       </p>
       <ul className="space-y-2">
         {REGLES.map((regle) => (
@@ -57,8 +57,8 @@ export function SectionConfidentialite() {
         ))}
       </ul>
       <p className="text-xs text-muet">
-        Et ce que le produit ne fait pas non plus : il ne note pas ta copie, ne donne jamais la
-        réponse de l’exercice d’origine, et n’entraîne aucun modèle.
+        And what the product does not do either: it does not grade your paper, never gives the answer
+        to the original exercise, and trains no model.
       </p>
     </Section>
   )

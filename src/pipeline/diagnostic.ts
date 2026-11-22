@@ -1,13 +1,13 @@
 /**
- * Auto-vérification — un contrôle et une preuve par sous-système.
+ * Self-check — one control and one proof per subsystem.
  *
- * L'idée : ne pas affirmer que ça marche, le **montrer**. Un bouton lance une
- * série de contrôles réels (proxy, disjoncteur, cache local, stockage local,
- * banque d'exercices, taxonomie, budget d'attente) et chaque ligne renvoie la
- * preuve de son succès, avec sa durée.
+ * The idea: do not claim it works, **show** it. A button runs a series of real
+ * checks (proxy, circuit breaker, local cache, local storage, exercise bank,
+ * taxonomy, wait budget) and each line returns proof of its success, with its
+ * duration.
  *
- * Aucun de ces contrôles ne consomme de quota modèle (les seuls appels réseau
- * sont `GET /health` et `GET /modeles`, qui sont gratuits).
+ * None of these checks consumes model quota (the only network calls are
+ * `GET /health` and `GET /modeles`, which are free).
  */
 import { BANQUE, exercicesDe } from '../domain/banque'
 import { CODES_ERREUR } from '../domain/taxonomy'
@@ -19,7 +19,7 @@ import type { Diagnostic } from '../domain/types'
 export type Controle = {
   nom: string
   ok: boolean
-  /** La preuve, en une phrase : ce qui a été vérifié et ce que ça a donné. */
+  /** The proof, in one sentence: what was checked and what it yielded. */
   preuve: string
   ms?: number
 }
@@ -32,7 +32,7 @@ function base(proxy: string): string {
   return proxy.replace(/\/analyze\/?$/, '')
 }
 
-/** Contrôle 1 : le proxy répond-il, et en combien de temps ? */
+/** Check 1: does the proxy answer, and how fast? */
 async function controleProxy(proxy: string): Promise<Controle> {
   const debut = Date.now()
   try {
@@ -43,16 +43,16 @@ async function controleProxy(proxy: string): Promise<Controle> {
       nom: 'Proxy (edge)',
       ok: reponse.ok === true && corps.ok === true,
       preuve: reponse.ok
-        ? `répond 200 en ${duree(debut)} ms — ${morts} modèle(s) en cooldown`
-        : `répond ${reponse.status}`,
+        ? `answers 200 in ${duree(debut)} ms — ${morts} model(s) in cooldown`
+        : `answers ${reponse.status}`,
       ms: duree(debut),
     }
   } catch {
-    return { nom: 'Proxy (edge)', ok: false, preuve: 'injoignable', ms: duree(debut) }
+    return { nom: 'Proxy (edge)', ok: false, preuve: 'unreachable', ms: duree(debut) }
   }
 }
 
-/** Contrôle 2 : la chaîne de repli est-elle connue et ordonnée ? */
+/** Check 2: is the fallback chain known and ordered? */
 async function controleModeles(proxy: string): Promise<Controle> {
   const debut = Date.now()
   try {
@@ -60,17 +60,17 @@ async function controleModeles(proxy: string): Promise<Controle> {
     const corps = (await reponse.json().catch(() => ({}))) as { chaine?: string[]; disjoncteur?: Record<string, number> }
     const chaine = corps.chaine ?? []
     return {
-      nom: 'Chaîne de repli',
+      nom: 'Fallback chain',
       ok: chaine.length > 0,
-      preuve: `${chaine.length} modèle(s) disponibles, premier tenté : ${(chaine[0] ?? '—').split('/').pop()}`,
+      preuve: `${chaine.length} model(s) available, first tried: ${(chaine[0] ?? '—').split('/').pop()}`,
       ms: duree(debut),
     }
   } catch {
-    return { nom: 'Chaîne de repli', ok: false, preuve: 'état des modèles illisible', ms: duree(debut) }
+    return { nom: 'Fallback chain', ok: false, preuve: 'model state unreadable', ms: duree(debut) }
   }
 }
 
-/** Contrôle 3 : le cache local écrit, relit et efface. */
+/** Check 3: the local cache writes, reads back and clears. */
 async function controleCache(): Promise<Controle> {
   const debut = Date.now()
   const empreinte = `auto-verification-${Date.now()}`
@@ -93,15 +93,15 @@ async function controleCache(): Promise<Controle> {
     return {
       nom: 'Cache local',
       ok: relu !== null,
-      preuve: relu ? 'écriture et relecture confirmées' : 'relecture impossible',
+      preuve: relu ? 'write and read-back confirmed' : 'read-back failed',
       ms: duree(debut),
     }
   } catch {
-    return { nom: 'Cache local', ok: false, preuve: 'IndexedDB indisponible', ms: duree(debut) }
+    return { nom: 'Cache local', ok: false, preuve: 'IndexedDB unavailable', ms: duree(debut) }
   }
 }
 
-/** Contrôle 4 : le stockage de l'historique répond-il ? */
+/** Check 4: does the history storage respond? */
 async function controleStockage(): Promise<Controle> {
   const debut = Date.now()
   try {
@@ -117,55 +117,55 @@ async function controleStockage(): Promise<Controle> {
     await enregistrerDiagnostic(factice)
     const apres = await chargerDiagnostics()
     return {
-      nom: 'Historique local',
+      nom: 'Local history',
       ok: apres.length >= avant.length,
-      preuve: `${apres.length} diagnostic(s) en local, écriture confirmée`,
+      preuve: `${apres.length} diagnosis/diagnoses stored locally, write confirmed`,
       ms: duree(debut),
     }
   } catch {
-    return { nom: 'Historique local', ok: false, preuve: 'IndexedDB indisponible', ms: duree(debut) }
+    return { nom: 'Local history', ok: false, preuve: 'IndexedDB unavailable', ms: duree(debut) }
   }
 }
 
-/** Contrôle 5 : la banque d'exercices est-elle complète et ciblée ? */
+/** Check 5: is the exercise bank complete and targeted? */
 export function controleBanque(): Controle {
   const debut = Date.now()
   const manquants = CODES_ERREUR.filter((code) => exercicesDe(code).length !== 3)
   const total = CODES_ERREUR.reduce((somme, code) => somme + BANQUE[code].length, 0)
   return {
-    nom: "Banque d'exercices",
+    nom: 'Exercise bank',
     ok: manquants.length === 0,
     preuve:
       manquants.length === 0
-        ? `${total} exercices locaux pour les ${CODES_ERREUR.length} types — 0 appel réseau`
-        : `types incomplets : ${manquants.join(', ')}`,
+        ? `${total} local exercises for the ${CODES_ERREUR.length} types — 0 network calls`
+        : `incomplete types: ${manquants.join(', ')}`,
     ms: duree(debut),
   }
 }
 
-/** Contrôle 6 : la taxonomie est-elle fermée et ses verrous en place ? */
+/** Check 6: is the taxonomy closed and its locks in place? */
 export function controleTaxonomie(): Controle {
   const debut = Date.now()
   return {
-    nom: 'Taxonomie fermée',
+    nom: 'Closed taxonomy',
     ok: CODES_ERREUR.length === 12,
-    preuve: `${CODES_ERREUR.length} codes, seuil de confiance ${SEUIL_REVUE} pour la seconde passe`,
+    preuve: `${CODES_ERREUR.length} codes, confidence threshold ${SEUIL_REVUE} for the second pass`,
     ms: duree(debut),
   }
 }
 
-/** Contrôle 7 : les bornes d'attente sont-elles celles qu'on believes ? */
+/** Check 7: are the wait bounds the ones we expect? */
 export function controleBudget(): Controle {
   const debut = Date.now()
   return {
-    nom: "Budget d'attente",
+    nom: 'Wait budget',
     ok: BUDGET_APPEL_MS > DELAI_APPEL_MS,
-    preuve: `${Math.round(DELAI_APPEL_MS / 1000)} s par appel, ${Math.round(BUDGET_APPEL_MS / 1000)} s de budget, ${CHAINE_MODELES.length} modèles`,
+    preuve: `${Math.round(DELAI_APPEL_MS / 1000)} s per call, ${Math.round(BUDGET_APPEL_MS / 1000)} s budget, ${CHAINE_MODELES.length} models`,
     ms: duree(debut),
   }
 }
 
-/** Lance tous les contrôles et renvoie une preuve par sous-système. */
+/** Runs all checks and returns one proof per subsystem. */
 export async function autoVerifier(proxy: string): Promise<Controle[]> {
   const controles: Controle[] = []
   controles.push(await controleProxy(proxy))

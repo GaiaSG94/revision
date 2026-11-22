@@ -1,12 +1,12 @@
 name: pages
 
-# Déploiement de la webapp statique sur GitHub Pages (URL publique HTTPS,
-# gratuite). Ce workflow n'est pas un check de PR : il ne tourne que sur
-# `main` et à la demande. Budget 5 min comme tout le reste.
+# Deployment of the static webapp to GitHub Pages (public HTTPS URL,
+# free). This workflow is not a PR check: it only runs on
+# `main` and on demand. 5 min budget like everything else.
 #
-# La clé InferHub n'est jamais ici : le site appelle soit le proxy edge
-# (`/api/analyze`), soit InferHub en BYOK (CORS ouvert), soit le mode démo
-# (réponses enregistrées sur le corpus).
+# The InferHub key is never here: the site calls either the edge proxy
+# (`/api/analyze`), InferHub via BYOK (open CORS), or demo mode
+# (recorded answers on the corpus).
 on:
   push:
     branches: [main]
@@ -32,7 +32,7 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Outillage Node
+      - name: Node tooling
         shell: bash
         run: |
           set -euo pipefail
@@ -41,15 +41,15 @@ jobs:
           node --version
           npm --version
 
-      - name: Dépendances
+      - name: Dependencies
         shell: bash
         run: npm ci --prefer-offline --no-audit --no-fund
 
       - name: Build (base Pages)
         shell: bash
         env:
-          VITE_BASE: /errata/
-          VITE_PROXY_URL: ${{ vars.RATURE_PROXY_URL }}
+          VITE_BASE: /revision/
+          VITE_PROXY_URL: ${{ vars.REVISION_PROXY_URL }}
         run: npm run build
 
       - uses: actions/upload-pages-artifact@v3

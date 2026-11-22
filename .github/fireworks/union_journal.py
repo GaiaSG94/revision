@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""Union déterministe des journaux en conflit, sans modèle.
+"""Deterministic union of conflicting logs, without a model.
 
-Un journal (`CHANGELOG.md`) s'écrit en tête : deux entrées ajoutées de part et
-d'autre ne sont pas un désaccord, c'est le même geste. Le 29/10, #215 a été
-rebasée six fois sur `CHANGELOG.md` — une saisine LLM, un push et une CI par
-rebase, jusqu'au plafond horaire. Ici, aucun appel : quand la base ne portait
-rien dans un bloc de conflit, les deux côtés sont réunis ; un bloc qui remplace
-une ligne commune reste au modèle, c'est un vrai désaccord.
+A log (`CHANGELOG.md`) is written at the head: two entries added on each
+side are not a disagreement, it is the same gesture. On 29/10, #215 was
+rebased six times over `CHANGELOG.md` — an LLM call, a push and a CI per
+rebase, until the hourly cap. Here, no call: when the base had nothing in a
+conflict block, both sides are united; a block replacing a common line is
+left to the model, it is a real disagreement.
 
-Bibliothèque standard uniquement. Importé par `conflict_agent.py` (copié seul
-par le sweep) : l'import est facultatif, son absence rend l'ancien chemin.
+Standard library only. Imported by `conflict_agent.py` (copied alone by
+the sweep): the import is optional, its absence falls back to the old path.
 """
 
 import os
 import subprocess
 import tempfile
 
-# Journaux en ajout pur : réunis sans modèle (racine ou sous-dossier).
+# Pure-addition logs: united without a model (root or subfolder).
 FICHIERS_AJOUTS = ("CHANGELOG.md", "CHANGELOG")
 MAX_FILE_BYTES = 200_000
 
@@ -26,12 +26,12 @@ def log(message):
 
 
 def journal_ajout_pur(path):
-    """Chemin d'un journal en ajout pur (racine ou sous-dossier) ?"""
+    """Is this the path of a pure-addition log (root or subfolder)?"""
     return any(path == nom or path.endswith("/" + nom) for nom in FICHIERS_AJOUTS)
 
 
 def stages(path):
-    """Trois versions d'un fichier en conflit : (base, nous, eux), ou None."""
+    """Three versions of a conflicting file: (base, ours, theirs), or None."""
     blobs = []
     for stage in (1, 2, 3):
         proc = subprocess.run(["git", "show", ":%d:%s" % (stage, path)],
@@ -43,9 +43,9 @@ def stages(path):
 
 
 def _bloc(lignes, debut):
-    """Découpe un bloc de conflit diff3 à partir de son marqueur d'ouverture.
+    """Cuts a diff3 conflict block from its opening marker.
 
-    Rend (nous, base, eux, indice suivant), ou None si un marqueur manque.
+    Returns (ours, base, theirs, next index), or None if a marker is missing.
     """
     i = debut + 1
     sections = []
@@ -62,11 +62,11 @@ def _bloc(lignes, debut):
 
 
 def union_sans_perte(texte):
-    """Réunit les deux côtés des conflits où la base ne portait rien.
+    """Unites both sides of conflicts where the base had nothing.
 
-    Un bloc de conflit diff3 dont la section base est vide est un ajout des
-    deux côtés. Le réunir ne perd aucune ligne. Si UN bloc remplace une ligne
-    commune, on rend None : c'est un vrai désaccord, le modèle tranche.
+    A diff3 conflict block whose base section is empty is an addition from
+    two sides. Uniting them loses no line. If ONE block replaces a common
+    line, we return None: it is a real disagreement, the model decides.
     """
     lignes = texte.splitlines(keepends=True)
     sortie, i, blocs = [], 0, 0
@@ -88,7 +88,7 @@ def union_sans_perte(texte):
 
 
 def _fusion(base, nous, eux):
-    """Sortie de `git merge-file --diff3` sur les trois versions, ou None."""
+    """Output of `git merge-file --diff3` on the three versions, or None."""
     temporaires = []
     try:
         for contenu in (nous, base, eux):
@@ -111,7 +111,7 @@ def _fusion(base, nous, eux):
 
 
 def resoudre_ajouts(path):
-    """Résout sans modèle un conflit d'ajouts purs. Rend True si écrit+indexé."""
+    """Resolves a pure-addition conflict without a model. Returns True if written+staged."""
     if not journal_ajout_pur(path):
         return False
     blobs = stages(path)
@@ -132,10 +132,10 @@ def resoudre_ajouts(path):
 
 
 def resoudre_par_union(files):
-    """Union déterministe sur chaque fichier d'ajouts purs ; rend les résolus."""
+    """Deterministic union on each pure-addition file; returns the resolved ones."""
     faits = []
     for path in files:
         if resoudre_ajouts(path):
-            log("%s : ajouts des deux côtés — union sans modèle" % path)
+            log("%s: additions on both sides — union without a model" % path)
             faits.append(path)
     return faits

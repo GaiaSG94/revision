@@ -1,13 +1,13 @@
 /**
- * Banc fusionné — mesure le NOUVEAU chemin (lots 1+3) : un seul appel vision
- * (annotations + typage), puis la seconde passe sur les fautes peu sûres.
+ * Merged bench — measures the NEW path (batches 1+3): a single vision call
+ * (annotations + typing), then the second pass on uncertain errors.
  *
- * À comparer aux mesures du chemin séparé (extraction puis classification),
- * déjà enregistrées le 11 novembre : latence 53-92 s par copie.
+ * Compare with the measurements of the separate path (extraction then
+ * classification), already recorded on 11 November: 53-92 s latency per paper.
  *
  *   INFERHUB_API_KEY=… npx vitest run tests/live/fusion.test.ts
  *
- * Ignoré sans clé : la CI reste verte et ne consomme aucun quota.
+ * Skipped without a key: CI stays green and consumes no quota.
  */
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -21,8 +21,8 @@ import { chaineModeles, construireCorps } from '../../src/pipeline/llm'
 import type { CodeErreur } from '../../src/domain/taxonomy'
 
 const CLE = process.env.INFERHUB_API_KEY ?? ''
-const AMONT = process.env.RATURE_AMONT ?? 'https://api.inferhub.dev/v1'
-const MODELE = process.env.RATURE_MODELE ?? ''
+const AMONT = process.env.REVISION_AMONT ?? 'https://api.inferhub.dev/v1'
+const MODELE = process.env.REVISION_MODELE ?? ''
 const DELAI_APPEL_MS = 120_000
 
 const transport: Transport = { proxy: `${AMONT}/chat/completions`, ...(MODELE ? { modele: MODELE } : {}) }
@@ -32,7 +32,7 @@ const manifeste: { copies: EntreeManifeste[] } = JSON.parse(
   readFileSync(fileURLToPath(new URL('../../corpus/images/manifeste.json', import.meta.url)), 'utf8'),
 )
 
-// Sous-ensemble représentatif : 2 nettes, 1 dégradée, 1 propre, 1 ambiguë.
+// Representative subset: 2 clean, 1 degraded, 1 clean-paper, 1 ambiguous.
 const CIBLES = ['copie-1-signes.png', 'copie-4-developpement.png', 'copie-8-grandeurs.png', 'copie-3-propre.png', 'copie-6-puissances-photo.png']
 
 async function appeler(requete: RequeteLLM, modele: string): Promise<string> {
@@ -43,7 +43,7 @@ async function appeler(requete: RequeteLLM, modele: string): Promise<string> {
     signal: AbortSignal.timeout(DELAI_APPEL_MS),
   })
   if (!reponse.ok) {
-    throw Object.assign(new Error(`amont HTTP ${reponse.status}`), { statut: reponse.status })
+    throw Object.assign(new Error(`upstream HTTP ${reponse.status}`), { statut: reponse.status })
   }
   const data = (await reponse.json()) as { choices?: { message?: { content?: string } }[] }
   return data.choices?.[0]?.message?.content ?? ''
@@ -52,7 +52,7 @@ async function appeler(requete: RequeteLLM, modele: string): Promise<string> {
 const TRANSITOIRES = new Set([402, 429, 500, 502, 503, 504])
 
 const clientDirect: ClientBrut = async (requete: RequeteLLM) => {
-  let derniere = 'aucun modèle disponible'
+  let derniere = 'no model available'
   for (const modele of chaineModeles(transport)) {
     try {
       return await appeler(requete, modele)
@@ -69,8 +69,8 @@ function image(nom: string): string {
   return `data:image/png;base64,${readFileSync(chemin).toString('base64')}`
 }
 
-describe.skipIf(!CLE)('nouveau chemin fusionné (lots 1+3)', () => {
-  it('mesure précision et latence sur le sous-ensemble représentatif', async () => {
+describe.skipIf(!CLE)('new merged path (batches 1+3)', () => {
+  it('measures accuracy and latency on the representative subset', async () => {
     let bons = 0
     let totalMs = 0
     for (const fichier of CIBLES) {
@@ -84,13 +84,13 @@ describe.skipIf(!CLE)('nouveau chemin fusionné (lots 1+3)', () => {
       const ok = diagnostic.typeDominant === entree.dominant
       if (ok) bons += 1
       console.info(
-        `[fusion:${fichier}] attendu=${entree.dominant ?? 'propre'} obtenu=${diagnostic.typeDominant ?? 'aucun'} ` +
-          `fautes=${diagnostic.nbFautes} revues=${revue.revues} modifiées=${revue.modifiees} ${(ms / 1000).toFixed(1)}s`,
+        `[fusion:${fichier}] expected=${entree.dominant ?? 'clean'} got=${diagnostic.typeDominant ?? 'none'} ` +
+          `errors=${diagnostic.nbFautes} reviews=${revue.revues} changed=${revue.modifiees} ${(ms / 1000).toFixed(1)}s`,
       )
     }
     const moyenne = totalMs / CIBLES.length / 1000
-    console.info(`[fusion] précision=${bons}/${CIBLES.length} latence moyenne=${moyenne.toFixed(1)}s`)
-    // Latence : cible < 25 s en moyenne (le chemin séparé mesurait 53-92 s).
+    console.info(`[fusion] accuracy=${bons}/${CIBLES.length} average latency=${moyenne.toFixed(1)}s`)
+    // Latency: target < 25 s on average (the separate path measured 53-92 s).
     expect(moyenne).toBeLessThan(40)
   }, 30 * 60_000)
 })

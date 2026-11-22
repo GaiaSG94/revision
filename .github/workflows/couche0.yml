@@ -1,33 +1,33 @@
 ﻿name: couche0
 
-# Couche 0 anti-rÃ©gression. Deux contrÃ´les dÃ©terministes, quasi gratuits,
-# sans checkout :
-#   - scope     : tout fichier modifiÃ© est dÃ©clarÃ© dans `## Scope` du corps ;
-#   - forbidden : motifs interdits dans le diff + fichiers de garde gelÃ©s.
-# Le juge vient de `main`, jamais du head de la PR : une PR ne modifie pas
-# son propre garde. Re-armable : `gh workflow run couche0.yml -f pr=<n>`.
-# Le check est requis : il doit donc rendre son verdict aussi bien sur la PR
-# que sur le groupe de merge de la file native (`gh-readonly-queue/<base>/pr-<n>-<sha>`).
+# Layer 0 anti-regression. Two deterministic, nearly free checks,
+# no checkout:
+#   - scope:     every modified file is declared in the body's `## Scope`;
+#   - forbidden: forbidden patterns in the diff + frozen guard files.
+# The judge comes from `main`, never the PR head: a PR does not modify
+# its own guard. Re-runnable: `gh workflow run couche0.yml -f pr=<n>`.
+# The check is required: it must give its verdict on the PR as well as on
+# the native merge queue's group (`gh-readonly-queue/<base>/pr-<n>-<sha>`).
 on:
   pull_request:
     types: [opened, synchronize, reopened, edited]
-  # File de merge native : mÃªme contrÃ´le sur le commit temporaire du groupe.
-  # `merge_group` est l'Ã©vÃ©nement d'aujourd'hui ; le `push` sur
-  # `gh-readonly-queue/**` reste pour les file(s) construites en push.
+  # Native merge queue: same check on the group’s temporary commit.
+  # `merge_group` is today’s event; `push` on
+  # `gh-readonly-queue/**` remains for queues built via push.
   merge_group:
   push:
     branches:
       - 'gh-readonly-queue/**'
-      # PAS de `mergify/merge-queue/**` (retirÃ© le 31/10) : la PR que la file
-      # ouvre sur sa branche de lot dÃ©clenche dÃ©jÃ  `pull_request` (types
-      # `opened` / `synchronize`), donc le check existe sur l'arbre fusionnÃ©.
-      # Le `push` en plus ne servait qu'Ã  crÃ©er un deuxiÃ¨me run pour la mÃªme
-      # tÃªte, que la concurrency annulait aussitÃ´t : un `couche0 = cancelled`
-      # de plus sur le SHA du lot, que Mergify peut lire comme un Ã©chec.
+      # NO `mergify/merge-queue/**` (removed on 31/10): the PR the queue
+      # opens on its batch branch already triggers `pull_request` (types
+      # `opened` / `synchronize`), so the check exists on the merged tree.
+      # The extra `push` only created a second run for the same head, which
+      # concurrency immediately cancelled: one more `couche0 = cancelled`
+      # on the batch SHA, which Mergify could read as a failure.
   workflow_dispatch:
     inputs:
       pr:
-        description: "NumÃ©ro de PR Ã  contrÃ´ler"
+        description: "PR number to check"
         required: true
         type: string
 
@@ -36,11 +36,10 @@ permissions:
   pull-requests: read
 
 concurrency:
-  # MÃªme doublon que dans `ci.yml` : sur une branche de file, le `push` de
-  # Mergify et la PR ouverte dessus rejouent le mÃªme contrÃ´le sur le mÃªme
-  # arbre. La clÃ© devient la tÃªte pour ces branches, donc le second
-  # dÃ©clenchement annule le premier â€” jamais un saut, qui publierait un check
-  # `skipped` que la file lirait comme un Ã©chec.
+  # Same overlap as in `ci.yml`: on a queue branch, Mergify's `push` and the
+  # open PR replay the same check on the same tree. The key becomes the head
+  # for these branches, so the second trigger cancels the first — never a
+  # skip, which would publish a `skipped` check the queue reads as a failure.
   group: couche0-${{ (startsWith(github.ref_name, 'mergify/merge-queue/') || startsWith(github.event.pull_request.head.ref || '', 'mergify/merge-queue/')) && (github.event.pull_request.head.sha || github.sha) || github.event.pull_request.number || inputs.pr || github.ref_name }}
   cancel-in-progress: true
 
@@ -50,24 +49,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: RÃ©cupÃ©rer le garde depuis main, puis contrÃ´ler la PR
+      - name: Fetch the guard from main, then check the PR
         env:
           GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          # `merge_group` ne porte pas `pull_request` : le numÃ©ro de PR vit dans
-          # le nom du ref (`refs/heads/gh-readonly-queue/<base>/pr-<n>-<sha>`).
+          # `merge_group` has no `pull_request`: the PR number lives in
+          # the ref name (`refs/heads/gh-readonly-queue/<base>/pr-<n>-<sha>`).
           REF: ${{ github.event.merge_group.head_ref || github.ref_name }}
           PR_HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           set -euo pipefail
-          # PR de lot crÃ©Ã©e par la file de merge (Mergify) : ce n'est pas une PR
-          # d'auteur, son corps n'a donc pas de `## Scope`, et son arbre est
-          # exactement celui des PR dÃ©jÃ  jugÃ©es une Ã  une avant l'entrÃ©e en
-          # file. La juger ici produirait un faux rouge qui Ã©jecterait le lot.
+          # Batch PR created by the merge queue (Mergify): this is not an author
+          # PR, so its body has no `## Scope`, and its tree is exactly that
+          # of PRs already judged one by one before entering the queue.
+          # Judging it here would produce a false red ejecting the batch.
           case "${PR_HEAD_REF:-}" in
             mergify/merge-queue/*)
-              echo "PR de lot de la file de merge : pÃ©rimÃ¨tre dÃ©jÃ  jugÃ© sur chaque PR â€” rien Ã  contrÃ´ler."
+              echo "Merge queue batch PR: scope already judged on each PR — nothing to check."
               exit 0
               ;;
           esac
@@ -83,10 +82,10 @@ jobs:
           if [ -z "$PR_NUMBER" ]; then
             case "${REF:-$GITHUB_REF_NAME}" in
               *mergify/merge-queue/*)
-                echo "Branche de lot Mergify : le pÃ©rimÃ¨tre a dÃ©jÃ  Ã©tÃ© jugÃ© sur chaque PR avant son entrÃ©e en file â€” rien de neuf Ã  contrÃ´ler ici."
+                echo "Mergify batch branch: scope already judged on each PR before the queue — nothing new to check here."
                 ;;
               *)
-                echo "::warning::aucun numÃ©ro de PR joignable depuis ce ref (${REF:-$GITHUB_REF_NAME}) â€” rien Ã  juger"
+                echo "::warning::no PR number reachable from this ref (${REF:-$GITHUB_REF_NAME}) — nothing to judge"
                 ;;
             esac
             exit 0
@@ -99,7 +98,7 @@ jobs:
               -o "$GARDE"
           }
           recuperer main || {
-            echo "::warning::garde absent de main â€” repli sur le head de la PR (premier atterrissage)"
+            echo "::warning::guard missing from main — falling back to the PR head (first landing)"
             recuperer "$HEAD_SHA"
           }
           python3 "$GARDE" check --pr "$PR_NUMBER"

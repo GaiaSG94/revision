@@ -1,9 +1,9 @@
 /**
- * Persistance locale (IndexedDB via idb-keyval) — RF-08, RNF-P1, RNF-P4.
+ * Local persistence (IndexedDB via idb-keyval) — RF-08, RNF-P1, RNF-P4.
  *
- * Ce qui vit ici : des diagnostics structurés, un profil, des réglages.
- * Ce qui n'y vit jamais : l'image de la copie, le nom de l'élève, la clé API
- * (la clé reste en mémoire de session, cf. `reglagesEnMemoire`).
+ * What lives here: structured diagnoses, a profile, settings.
+ * What never lives here: the paper image, the student's name, the API key
+ * (the key stays in session memory, see `reglagesEnMemoire`).
  */
 import { clear, get, set } from 'idb-keyval'
 import { CLES } from '../domain/config'
@@ -12,7 +12,7 @@ import type { Diagnostic, Profil, Reglages } from '../domain/types'
 
 export const REGLAGES_VIDES: Reglages = { clePersonnelle: '', modele: '', proxy: '' }
 
-/** Un diagnostic lisible a un identifiant et une liste de fautes. */
+/** A readable diagnosis has an identifier and a list of errors. */
 function diagnosticValide(valeur: unknown): valeur is Diagnostic {
   if (typeof valeur !== 'object' || valeur === null) return false
   const candidat = valeur as Partial<Diagnostic>
@@ -20,9 +20,8 @@ function diagnosticValide(valeur: unknown): valeur is Diagnostic {
 }
 
 /**
- * IndexedDB peut rendre n'importe quoi (écriture interrompue, données d'une
- * version antérieure, quota) : on filtre au chargement plutôt que de laisser
- * un écran planter.
+ * IndexedDB can return anything (interrupted write, data from an older
+ * version, quota): we filter on load rather than letting a screen crash.
  */
 export async function chargerDiagnostics(): Promise<Diagnostic[]> {
   const brut = await get<unknown>(CLES.diagnostics)
@@ -59,7 +58,7 @@ export async function sauverReglages(reglages: Reglages): Promise<void> {
   await set(CLES.reglages, reglages)
 }
 
-/** RNF-P4 : exportable et supprimable en un clic. */
+/** RNF-P4: exportable and deletable in one click. */
 export async function effacerHistorique(): Promise<void> {
   await clear()
 }

@@ -1,4 +1,4 @@
-<!-- v2 — sortie bornée, 12/11 -->
+<!-- v2 — bounded output -->
 
 # Prompt — Relevance guardrail (step 6, second pass)
 

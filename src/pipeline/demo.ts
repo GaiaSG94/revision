@@ -1,18 +1,17 @@
 /**
- * Mode démonstration — rejoue des réponses **réellement enregistrées** par le
- * modèle sur les copies du corpus (`corpus/reponses/*.json`, captées par
+ * Demo mode — replays responses **really recorded** from the model on the
+ * corpus papers (`corpus/reponses/*.json`, captured by
  * `tests/live/enregistrer-demo.test.ts`).
  *
- * À quoi ça sert : la démo publique n'a pas de clé, et l'amont peut être lent ou
- * sans capacité le jour du jugement. Tout le produit reste démontrable hors
- * ligne — y compris le mode professeur et la trajectoire du profil, qui demandent
- * plusieurs copies. Les parseurs zod travaillent sur du vrai JSON de modèle,
- * rien n'est court-circuité.
+ * Purpose: the public demo has no key, and the upstream may be slow or out of
+ * capacity on judging day. The whole product remains demonstrable offline —
+ * including teacher mode and the profile trajectory, which need several papers.
+ * The zod parsers work on real model JSON; nothing is short-circuited.
  *
- * Les copies disponibles sont découvertes au build (`import.meta.glob`) : ajouter
- * un enregistrement dans `corpus/reponses/` étend la démo sans toucher au code.
+ * Available papers are discovered at build time (`import.meta.glob`): adding a
+ * recording in `corpus/reponses/` extends the demo without touching the code.
  *
- * Honnêteté : l'UI affiche « réponses enregistrées » quand ce mode tourne.
+ * Honesty: the UI displays "recorded responses" when this mode is running.
  */
 import { libelleDe } from '../domain/taxonomy'
 import type { CodeErreur } from '../domain/taxonomy'
@@ -27,10 +26,10 @@ type Enregistrement = {
   modele: string
   enregistreLe: string
   dominant: string
-  /** Absent des enregistrements antérieurs au 12/11 : toléré. */
+  /** Absent from recordings before 12/11: tolerated. */
   nbFautes?: number
   revues?: number
-  /** Durées réelles mesurées lors de l'enregistrement, rejouées par la démo. */
+  /** Real durations measured during recording, replayed by the demo. */
   durees?: Record<string, number>
   reponses: Record<string, string>
 }
@@ -43,9 +42,9 @@ export type CopieDemo = {
 }
 
 /**
- * Un échantillon : une copie photo que le jury peut tester. Elle n'a pas
- * forcément de réponses enregistrées — sans elles, l'analyse passe par le
- * modèle en ligne (le proxy edge), avec elles elle rejoue hors ligne.
+ * A sample: a paper photo the user can try. It may not have recorded responses
+ * — without them, the analysis goes through the online model (the edge proxy);
+ * with them, it replays offline.
  */
 export type Echantillon = {
   id: string
@@ -57,14 +56,14 @@ export type Echantillon = {
   resume: string
   note: string
   typesAttendus: string[]
-  /** Réponses enregistrées sur CETTE photo : absent = analyse en ligne. */
+  /** Responses recorded for THIS photo: absent = online analysis. */
   enregistrement: Enregistrement | null
 }
 
 /**
- * `eager` + `import: 'default'` : sans l'option `import`, Vite rend le MODULE
- * (objet) et non la valeur — en dev, `fetch(module)` lève « Cannot convert
- * object to primitive value ». Bug payé le 12/11.
+ * `eager` + `import: 'default'`: without the `import` option, Vite returns the
+ * MODULE (object) rather than the value — in dev, `fetch(module)` throws
+ * "Cannot convert object to primitive value". Bug paid for on 12/11.
  */
 const REPONSES = import.meta.glob<Enregistrement>('../../corpus/reponses/*.json', {
   eager: true,
@@ -72,18 +71,18 @@ const REPONSES = import.meta.glob<Enregistrement>('../../corpus/reponses/*.json'
 })
 const IMAGES = import.meta.glob<string>('../../corpus/demo/*.{png,jpg}', { eager: true, import: 'default' })
 
-/** Titre lisible : le type dominant, et le nombre de fautes quand il est connu. */
+/** Readable title: the dominant type, and the error count when known. */
 function titreCopie(id: string, enregistrement: Enregistrement): string {
   const libelle = libelleDe(enregistrement.dominant as CodeErreur)
   const fautes = enregistrement.nbFautes
-  if (enregistrement.dominant === 'propre') return `${id} — aucune erreur détectée`
+  if (enregistrement.dominant === 'propre') return `${id} — no errors detected`
   return fautes === undefined ? `${id} — ${libelle}` : `${libelle} — ${fautes} mistake(s)`
 }
 
 /**
- * Les échantillons : toutes les copies décrites dans `corpus/copies-demo.json`
- * pour lesquelles une photo existe. C'est la source de vérité unique — la même
- * que celle qui a produit les photos et les réponses enregistrées.
+ * The samples: every paper described in `corpus/copies-demo.json` for which a
+ * photo exists. This is the single source of truth — the same one that produced
+ * the photos and the recorded responses.
  */
 function construireEchantillons(): Echantillon[] {
   const echantillons: Echantillon[] = []
@@ -108,15 +107,15 @@ function construireEchantillons(): Echantillon[] {
 
 export const COPIES_ECHANTILLON: Echantillon[] = construireEchantillons()
 
-/** Un échantillon par son identifiant. */
+/** A sample by its identifier. */
 export function echantillonDe(id: string): Echantillon | undefined {
   return COPIES_ECHANTILLON.find((e) => e.id === id)
 }
 
 /**
- * Titre de carte de l'écran « Sample papers » : « Jordan · Test 3 — Algebra &
- * derivatives ». L'élève d'abord, puis le contrôle, puis le titre du contrôle ;
- * la date reste dans le manifeste, elle n'occupe pas la carte.
+ * Card title for the "Sample papers" screen: "Jordan · Test 3 — Algebra &
+ * derivatives". Student first, then the test, then the test title; the date
+ * stays in the manifest, it does not take up space on the card.
  */
 export function titreCarte(echantillon: Echantillon): string {
   const eleve = echantillon.eleve.split(' ')[0] ?? echantillon.eleve
@@ -128,7 +127,7 @@ function estEnregistre(e: Echantillon): e is Echantillon & { enregistrement: Enr
   return e.enregistrement !== null
 }
 
-/** Les copies **rejouables** hors ligne : celles dont les réponses sont capturées. */
+/** **Replayable** offline papers: those whose responses are captured. */
 export const COPIES_DEMO: CopieDemo[] = COPIES_ECHANTILLON.filter(estEnregistre).map((e) => ({
   id: e.id,
   titre: titreCopie(e.id, e.enregistrement),
@@ -139,10 +138,10 @@ export const COPIES_DEMO: CopieDemo[] = COPIES_ECHANTILLON.filter(estEnregistre)
 export const ID_COPIES_DEMO = COPIES_DEMO.map((copie) => copie.id)
 
 /**
- * Le tour guidé de l'accueil : la trajectoire de Jordan (mauvaise récurrente
- * E01 sur trois copies, puis une copie propre). C'est la même histoire que
- * celle montrée sur l'écran « Sample papers » — le juge voit les deux.
- * Si un enregistrement manque, la copie est simplement sautée.
+ * The guided tour on the home screen: Jordan's trajectory (recurring E01
+ * mistake on three papers, then a clean paper). It is the same story shown on
+ * the "Sample papers" screen — the judge sees both.
+ * If a recording is missing, the paper is simply skipped.
  */
 export const TOUR_DEMO = ['v2-copie-1', 'v2-copie-2', 'v2-copie-3', 'v2-copie-4'].filter((id) =>
   ID_COPIES_DEMO.includes(id),
@@ -153,7 +152,7 @@ export function copieDemo(id?: string): CopieDemo | undefined {
   return COPIES_DEMO.find((copie) => copie.id === id)
 }
 
-/** Quelle étape le prompt en cours correspond-il ? (marqueurs de titres) */
+/** Which step does the current prompt correspond to? (title markers) */
 export function etapeDe(requete: RequeteLLM): EtapeDemo {
   const system = requete.system
   if (system.includes('Relevance guardrail')) return 'verdict'
@@ -162,20 +161,19 @@ export function etapeDe(requete: RequeteLLM): EtapeDemo {
   return 'analyse'
 }
 
-/** Pause courte : la démo rejoue le rythme réel de l'enregistrement. */
+/** Short pause: the demo replays the recording's real pace. */
 function attendre(ms: number): Promise<void> {
   return new Promise((resoudre) => setTimeout(resoudre, ms))
 }
 
 /**
- * Client de rejeu pour une copie donnée. Deux rythmes :
- * - `attenteMax` absent : on **attend la durée réellement mesurée** lors de
- *   l'enregistrement — sans cela, la démo serait instantanée et donc peu
- *   crédible (« 0,1 s » pour une analyse complète est un signal d'alerte
- *   pour un juge technique) ;
- * - `attenteMax` fourni (tour guidé multi-copies) : la même réponse, le même
- *   ordre, mais un plafond par étape pour que quatre copies tiennent en
- *   quelques dizaines de secondes. L'UI dit honnêtement « accéléré ».
+ * Replay client for a given paper. Two paces:
+ * - no `attenteMax`: we **wait the duration actually measured** during
+ *   recording — otherwise the demo would be instantaneous and therefore not
+ *   credible ("0.1 s" for a full analysis is a red flag for a technical judge);
+ * - `attenteMax` supplied (multi-paper guided tour): the same response, the
+ *   same order, but a per-step cap so four papers fit in a few tens of
+ *   seconds. The UI honestly says "accelerated".
  */
 export function clientDemoPour(
   id?: string,
@@ -195,8 +193,8 @@ export function clientDemoPour(
         `Demo mode: no recorded answer for step "${etape}" — recapture the corpus.`,
       )
     }
-    // Les durées sont enregistrées par ÉTAPE du pipeline (extrait, classifie,
-    // genere), alors que l'appel est identifié par son prompt. Correspondance :
+    // Durations are recorded per pipeline STEP (extrait, classifie, genere),
+    // while the call is identified by its prompt. Mapping:
     const etapePipeline = {
       analyse: 'extrait',
       revue: 'classifie',
@@ -215,7 +213,7 @@ export function clientDemo(): ClientBrut {
   return clientDemoPour()
 }
 
-/** Métadonnées de l'enregistrement, affichées dans l'UI. */
+/** Recording metadata, displayed in the UI. */
 export function origineDemo(id?: string) {
   const copie = copieDemo(id)
   if (!copie) return null
@@ -229,7 +227,7 @@ export function origineDemo(id?: string) {
   }
 }
 
-/** Une copie de démo, en `File` : le pipeline tourne exactement comme en vrai. */
+/** A demo paper, as a `File`: the pipeline runs exactly as it does for real. */
 export async function fichierDemoPour(id?: string): Promise<File> {
   const copie = copieDemo(id)
   if (!copie) throw new Error('Demo mode: no recorded paper available.')
@@ -239,9 +237,8 @@ export async function fichierDemoPour(id?: string): Promise<File> {
 }
 
 /**
- * Un échantillon, en `File` — enregistré ou non. Le jury teste ainsi une
- * vraie photo : le pipeline la traite exactement comme une photo prise au
- * téléphone.
+ * A sample, as a `File` — recorded or not. The user thus tries a real photo:
+ * the pipeline treats it exactly like a photo taken with a phone.
  */
 export async function fichierEchantillon(id: string): Promise<File> {
   const echantillon = echantillonDe(id)

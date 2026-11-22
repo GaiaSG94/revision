@@ -1,8 +1,8 @@
-/** Fiche d'une étape du pipeline : ce qui entre, ce qui sort, ce que ça coûte. */
+/** Fact sheet for a pipeline step: what goes in, what comes out, what it costs. */
 export type FicheEtape = {
   entree: string
   sortie: string
-  /** Latence réellement mesurée (corpus + démo publique), pas une promesse. */
+  /** Actually measured latency (corpus + public demo), not a promise. */
   latence: string
   note?: string
 }
@@ -10,8 +10,8 @@ export type FicheEtape = {
 type Props = { ordre: number; libelle: string; fiche: FicheEtape }
 
 /**
- * Une ligne du pipeline. Le libellé vient de `ETAPES` (source unique), la fiche
- * est la part documentaire : contrat d'entrée/sortie et temps mesuré.
+ * A pipeline row. The label comes from `ETAPES` (single source), the fact sheet
+ * is the documentation part: input/output contract and measured time.
  */
 export function LignePipeline({ ordre, libelle, fiche }: Props) {
   return (
@@ -29,11 +29,11 @@ export function LignePipeline({ ordre, libelle, fiche }: Props) {
       </div>
       <dl className="mt-2 space-y-1 text-sm">
         <div className="flex gap-2">
-          <dt className="shrink-0 text-muet">Entrée</dt>
+          <dt className="shrink-0 text-muet">Input</dt>
           <dd className="text-texte/90">{fiche.entree}</dd>
         </div>
         <div className="flex gap-2">
-          <dt className="shrink-0 text-muet">Sortie</dt>
+          <dt className="shrink-0 text-muet">Output</dt>
           <dd className="text-texte/90">{fiche.sortie}</dd>
         </div>
       </dl>

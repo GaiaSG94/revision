@@ -12,9 +12,9 @@ import { telechargerCsv, telechargerMarkdown } from '../../export/telecharger'
 import { BarreType } from '../components/BarreType'
 import { Bouton } from '../components/Bouton'
 import { Carte } from '../components/Carte'
-import { useRature } from '../../etat/useRature'
+import { useRature } from '../../etat/useRevision'
 
-/** Écran 5 : le profil d'erreur longitudinal (stretch 9 — presque gratuit). */
+/** Screen 5: the longitudinal error profile (stretch 9 — almost free). */
 export function Profil() {
   const { profil, diagnostics, aller, resultat } = useRature()
   const lignes = classement(profil)

@@ -1,9 +1,9 @@
 /**
- * Étape 6 — Exercice ciblé + garde-fou de pertinence (§18.3).
+ * Step 6 — Targeted exercise + relevance safeguard (§18.3).
  *
- * Le générateur propose, un second passage juge. Si le juge refuse, on
- * régénère — deux tentatives maximum — puis on l'annonce honnêtement. On ne
- * sert JAMAIS un exercice hors sujet : mieux vaut dire « non disponible ».
+ * The generator proposes, a second pass judges. If the judge refuses, we
+ * regenerate — two attempts maximum — then say so honestly. We NEVER serve an
+ * off-topic exercise: it is better to say "unavailable".
  */
 import generationMd from '../../prompts/generation.md?raw'
 import gardeFouMd from '../../prompts/garde-fou.md?raw'
@@ -27,24 +27,24 @@ export type ArgsExercice = {
   transport: Transport
   client?: ClientBrut
   /**
-   * false (défaut) : exercice tiré de la **banque locale** — aucun appel réseau,
-   * donc l'étape 6 est instantanée (idée 1). true : exercice inédit, généré et
-   * vérifié par le modèle (2 appels, 30 à 110 s sur l'amont).
+   * false (default): exercise drawn from the **local bank** — no network call,
+   * so step 6 is instant (idea 1). true: fresh exercise, generated and verified
+   * by the model (2 calls, 30 to 110 s on the upstream).
    */
   inedit?: boolean
-  /** Identifiants d'exercices déjà proposés, pour en servir un autre. */
+  /** Identifiers of exercises already offered, to serve another one. */
   dejaVus?: string[]
-  /** Graine de tirage : la banque reste déterministe à options égales. */
+  /** Draw seed: the bank remains deterministic for equal options. */
   graine?: number
 }
 
 export function messageGeneration(typeDominant: CodeErreur, extraitCopie: string, niveau: string): string {
   return [
-    `Type d'erreur à travailler : ${typeDominant} — ${libelleDe(typeDominant)}.`,
-    `Signature recherchée : ${signatureDe(typeDominant)}.`,
-    `Niveau : ${niveau}.`,
+    `Error type to work on: ${typeDominant} — ${libelleDe(typeDominant)}.`,
+    `Signature to look for: ${signatureDe(typeDominant)}.`,
+    `Level: ${niveau}.`,
     '',
-    "Extrait de la copie analysée (ne le recopie pas, prends-en seulement le niveau) :",
+    "Excerpt of the analysed paper (do not copy it, only use its level):",
     extraitCopie.slice(0, 600),
   ].join('\n')
 }
@@ -55,15 +55,15 @@ export function messageGardeFou(
   extraitCopie: string,
 ): string {
   return [
-    `Type visé : ${typeDominant} — ${libelleDe(typeDominant)} (${signatureDe(typeDominant)}).`,
+    `Targeted type: ${typeDominant} — ${libelleDe(typeDominant)} (${signatureDe(typeDominant)}).`,
     '',
-    'Exercice d’origine (à ne pas recopier) :',
+    'Original exercise (do not copy):',
     extraitCopie.slice(0, 400),
     '',
-    'Exercice proposé :',
-    `Énoncé : ${exercice.enonce}`,
-    `Indices : ${exercice.indices.join(' | ') || 'aucun'}`,
-    `Solution : ${exercice.solution}`,
+    'Proposed exercise:',
+    `Prompt: ${exercice.enonce}`,
+    `Hints: ${exercice.indices.join(' | ') || 'none'}`,
+    `Solution: ${exercice.solution}`,
   ].join('\n')
 }
 
@@ -72,12 +72,12 @@ export function verdictAccepte(verdict: VerdictGardeFou): boolean {
 }
 
 async function proposer(args: ArgsExercice, client: ClientBrut, tentative: number): Promise<Exercice> {
-  const niveau = args.niveau ?? 'lycée'
+  const niveau = args.niveau ?? 'high school'
   const texte = await client({
     system: PROMPT_GENERATION,
     user: messageGeneration(args.typeDominant, args.extraitCopie, niveau),
     json: true,
-    temperature: 0.5,
+    temperevision: 0.5,
     maxTokens: 800,
   })
   const brut = parserExercice(texte)
@@ -102,15 +102,15 @@ async function juger(
     system: PROMPT_GARDE_FOU,
     user: messageGardeFou(exercice, args.typeDominant, args.extraitCopie),
     json: true,
-    temperature: 0,
+    temperevision: 0,
     maxTokens: 400,
   })
   return parserVerdict(texte)
 }
 
 /**
- * Point d'entrée de l'étape 6 : banque locale par défaut, modèle uniquement
- * pour un « exercice inédit » demandé explicitement.
+ * Entry point for step 6: local bank by default, model only for an explicitly
+ * requested "fresh exercise".
  */
 export async function obtenirExercice(
   args: ArgsExercice,
@@ -123,7 +123,7 @@ export async function obtenirExercice(
     if (!tirage) {
       return {
         exercice: null,
-        message: `Pas d'exercice dans la banque pour ce type (${libelleDe(args.typeDominant)}).`,
+        message: `No exercise in the bank for this type (${libelleDe(args.typeDominant)}).`,
       }
     }
     return { exercice: exerciceVerifie(tirage) }
@@ -142,6 +142,6 @@ export async function genererExerciceVerifie(
   }
   return {
     exercice: null,
-    message: `Exercice non disponible pour ce type (${libelleDe(args.typeDominant)}) : mieux vaut rien qu'un exercice à côté du sujet.`,
+    message: `Exercise unavailable for this type (${libelleDe(args.typeDominant)}): better nothing than an off-topic exercise.`,
   }
 }

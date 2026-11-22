@@ -1,12 +1,12 @@
 /**
- * Étape 2 — Anonymisation (RNF-P2) : le nom de l'élève est masqué AVANT tout
- * affichage. On pixelise le bandeau d'en-tête de la copie (là où le nom est
- * écrit dans la quasi-totalité des cas) plutôt que de le flouter : un flou se
- * laisse deviner, une pixelisation non.
+ * Step 2 — Anonymization (RNF-P2): the student's name is masked BEFORE any
+ * display. We pixelate the paper's header banner (where the name appears in
+ * nearly all cases) rather than blurring it: a blur can be guessed through, a
+ * pixelation cannot.
  */
 import type { Zone } from '../domain/types'
 
-/** Bandeau supérieur centré : le nom est presque toujours en haut de la copie. */
+/** Centered top banner: the name is almost always at the top of the paper. */
 export function zoneBandeau(): Zone {
   return { x: 0.18, y: 0.02, largeur: 0.64, hauteur: 0.16 }
 }
@@ -15,7 +15,7 @@ function borne(valeur: number): number {
   return Math.min(1, Math.max(0, valeur))
 }
 
-/** Normalise une zone quelconque en coordonnées relatives valides. */
+/** Normalizes any zone into valid relative coordinates. */
 export function normaliserZone(zone: Zone): Zone {
   const x = borne(Math.min(zone.x, zone.x + zone.largeur))
   const y = borne(Math.min(zone.y, zone.y + zone.hauteur))
@@ -29,7 +29,7 @@ async function chargerDepuisDataUrl(dataUrl: string): Promise<ImageBitmap> {
   return createImageBitmap(await reponse.blob())
 }
 
-/** Pixelise une zone : on réduit à quelques blocs puis on ré-agrandit sans lissage. */
+/** Pixelates a zone: reduce to a few blocks, then scale back up without smoothing. */
 function pixeliser(contexte: CanvasRenderingContext2D, zone: Zone, bloc: number): void {
   const x = Math.round(zone.x * contexte.canvas.width)
   const y = Math.round(zone.y * contexte.canvas.height)

@@ -1,10 +1,10 @@
 /**
- * Trajectoire du profil — lot 5. Le pitch du produit : « 1ʳᵉ copie → un
- * diagnostic, 3ᵉ → un pattern, 5ᵉ → un plan ». Jusqu'ici le profil était une
- * photo (des compteurs) ; ce module en fait une trajectoire : comment chaque
- * type évolue au fil des copies, et quand une faille a disparu.
+ * Profile trajectory — batch 5. The product pitch: "1st paper → a diagnosis,
+ * 3rd → a pattern, 5th → a plan". Until now the profile was a snapshot (counters);
+ * this module turns it into a trajectory: how each type evolves across papers,
+ * and when a weakness has disappeared.
  *
- * Logique pure, testée, aucune dépendance au DOM.
+ * Pure, tested logic, with no DOM dependency.
  */
 import { CODES_ERREUR, libelleDe } from './taxonomy'
 import type { CodeErreur } from './taxonomy'
@@ -14,9 +14,9 @@ import type { Diagnostic, Profil } from './types'
 export type Tendance = 'baisse' | 'hausse' | 'stable' | 'inconnue'
 
 /**
- * Nombre de fautes d'un code par copie, dans l'ordre chronologique. E11 et E99
- * comptent 0 dans la série pondérée : ce ne sont pas des lacunes de fond, les
- * faire varier ferait croire à une progression qui n'existe pas.
+ * Number of errors of a code per paper, in chronological order. E11 and E99
+ * count 0 in the weighted series: they are not underlying gaps, and letting
+ * them vary would suggest a progress that does not exist.
  */
 export function occurrencesParCopie(diagnostics: Diagnostic[], code: CodeErreur): number[] {
   return diagnostics.map(
@@ -26,9 +26,9 @@ export function occurrencesParCopie(diagnostics: Diagnostic[], code: CodeErreur)
 }
 
 /**
- * Tendance simple et documentée : on compare la moyenne des 2 dernières copies
- * à celle des copies précédentes. Moins de 2 copies → « inconnue » (on ne devine
- * pas une progression sur une seule copie).
+ * Simple, documented trend: compare the average of the last 2 papers with that
+ * of the previous papers. Fewer than 2 papers → "unknown" (we do not guess a
+ * progress from a single paper).
  */
 export function tendance(serie: number[]): Tendance {
   if (serie.length < 2) return 'inconnue'
@@ -44,9 +44,9 @@ export function tendance(serie: number[]): Tendance {
 }
 
 /**
- * Une faille a « disparu » si elle était dominante sur les premières copies et
- * n'apparaît plus du tout sur les 3 dernières. Règle volontairement prudente :
- * il faut au moins 4 copies pour pouvoir l'affirmer.
+ * A weakness has "disappeared" if it was dominant on the early papers and no
+ * longer appears at all on the last 3. Deliberately cautious rule: at least 4
+ * papers are required to claim this.
  */
 export function failleDisparue(diagnostics: Diagnostic[], code: CodeErreur): boolean {
   if (diagnostics.length < 4) return false
@@ -61,7 +61,7 @@ export function pointsCourbe(serie: number[]): { index: number; valeur: number }
   return serie.map((valeur, index) => ({ index, valeur }))
 }
 
-/** Phrase bienveillante qui reflète la tendance du type dominant. */
+/** Caring sentence reflecting the trend of the dominant type. */
 export function messageProgression(profil: Profil, diagnostics: Diagnostic[]): string {
   const dominant = typeDominant(profil)
   if (!dominant) return 'No recurring mistake yet: add a paper to start your trajectory.'
@@ -85,7 +85,7 @@ export function messageProgression(profil: Profil, diagnostics: Diagnostic[]): s
   return `Analyse at least two papers to see your progress on "${nom}".`
 }
 
-/** Les codes à tracer : les 3 plus fréquents du profil. */
+/** Codes to plot: the 3 most frequent in the profile. */
 export function codesATracer(profil: Profil): CodeErreur[] {
   return CODES_ERREUR.filter((code) => (profil.parType[code] ?? 0) > 0)
     .sort((a, b) => (profil.parType[b] ?? 0) - (profil.parType[a] ?? 0))

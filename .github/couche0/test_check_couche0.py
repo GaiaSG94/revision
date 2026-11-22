@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Tests ciblés de check_couche0.py — bibliothèque standard uniquement.
+"""Targeted tests for check_couche0.py — standard library only.
 
 Lance : python3 .github/couche0/test_check_couche0.py
-(depuis la racine du dépôt).
+(from the repository root).
 """
 import unittest
 
@@ -14,7 +14,7 @@ def fichier(nom, patch=""):
 
 
 class ParseScopeTest(unittest.TestCase):
-    """Extraction des motifs déclarés dans `## Scope`."""
+    """Extraction of patterns declared in `## Scope`."""
 
     def test_puces_extraites(self):
         corps = "Titre\n\n## Scope\n\n- `app/Foo.kt` — raison\n- `core/` — raison\n"
@@ -30,7 +30,7 @@ class ParseScopeTest(unittest.TestCase):
 
 
 class MatchesTest(unittest.TestCase):
-    """Un motif désigne un fichier : exact, dossier, ou glob."""
+    """A pattern designates a file: exact, folder, or glob."""
 
     def test_exact(self):
         self.assertTrue(check_couche0.matches("a/b.kt", "a/b.kt"))
@@ -44,7 +44,7 @@ class MatchesTest(unittest.TestCase):
 
 
 class ExemptTest(unittest.TestCase):
-    """Fichiers régénérables : pas besoin de les déclarer."""
+    """Regenerable files: no need to declare them."""
 
     def test_build_exempte(self):
         self.assertTrue(check_couche0.is_exempt("app/build/rapport.xml"))
@@ -57,13 +57,13 @@ class ExemptTest(unittest.TestCase):
 
 
 class ScopeTest(unittest.TestCase):
-    """Tout fichier modifié déclaré, toute déclaration servie."""
+    """Every modified file declared, every declaration used."""
 
     def test_non_declare_signale(self):
         erreurs = []
         corps = "## Scope\n\n- `docs/` — x\n"
         check_couche0.check_scope([fichier("app/Foo.kt")], corps, erreurs)
-        non_declare = [e for e in erreurs if "non déclaré" in e]
+        non_declare = [e for e in erreurs if "not declared" in e]
         self.assertEqual(len(non_declare), 1)
         self.assertIn("app/Foo.kt", non_declare[0])
 
@@ -71,7 +71,7 @@ class ScopeTest(unittest.TestCase):
         erreurs = []
         check_couche0.check_scope([fichier("app/Foo.kt")], "sans section", erreurs)
         self.assertEqual(len(erreurs), 1)
-        self.assertIn("aucune section", erreurs[0])
+        self.assertIn("no `## Scope` section", erreurs[0])
 
     def test_declaration_inutilisee_signalee(self):
         erreurs = []
@@ -89,7 +89,7 @@ class ScopeTest(unittest.TestCase):
 
 
 class ForbiddenTest(unittest.TestCase):
-    """Motifs interdits dans les lignes ajoutées + gardes gelées."""
+    """Forbidden patterns in added lines + frozen guards."""
 
     def test_garde_sans_mention_refusee(self):
         for garde in (".github/workflows/ci.yml",
@@ -109,30 +109,30 @@ class ForbiddenTest(unittest.TestCase):
         self.assertEqual(erreurs, [])
 
     def test_date_ancienne_refusee(self):
-        # Fragmenté exprès : la garde scanne les lignes ajoutées du diff,
-        # le cas de test ne doit pas se faire refuser lui-même.
+        # Deliberately split: the guard scans added diff lines,
+        # the test case must not refuse itself.
         vieux = "2026-10-2" + "4"
         erreurs = []
         check_couche0.check_forbidden(
-            [fichier("docs/N.md", "+ relevé du " + vieux)], "corps", erreurs)
+            [fichier("docs/N.md", "+ reading of " + vieux)], "body", erreurs)
         self.assertEqual(len(erreurs), 1)
 
     def test_date_recente_acceptee(self):
         erreurs = []
         check_couche0.check_forbidden(
-            [fichier("docs/N.md", "+ relevé du 2026-10-29")], "corps", erreurs)
+            [fichier("docs/N.md", "+ reading of 2026-10-29")], "body", erreurs)
         self.assertEqual(erreurs, [])
 
     def test_cle_api_refusee(self):
         fausse = "sk-" + "a" * 24
         erreurs = []
         check_couche0.check_forbidden(
-            [fichier("app/K.kt", "+ cle = " + fausse)], "corps", erreurs)
+            [fichier("app/K.kt", "+ cle = " + fausse)], "body", erreurs)
         self.assertEqual(len(erreurs), 1)
 
     def test_garde_qui_se_cite_ignoree(self):
-        # La garde est gelée elle-même : le corps porte la mention, et le
-        # motif cité dans son propre code ne doit pas la faire refuser.
+        # The guard is frozen itself: the body carries the mention, and the
+        # pattern cited in its own code must not make it refuse.
         fausse = "sk-" + "a" * 24
         erreurs = []
         check_couche0.check_forbidden(
@@ -143,7 +143,7 @@ class ForbiddenTest(unittest.TestCase):
 
 
 class SuggestionScopeTest(unittest.TestCase):
-    """Le refus rend un bloc `## Scope` copiable (même règle, moins d'attente)."""
+    """Refusal yields a copyable `## Scope` block (same rule, less waiting)."""
 
     def test_trois_fichiers_meme_dossier_devinent_un_glob(self):
         fichiers = [fichier("app/res/raw/vp_%d.mp3" % i) for i in range(38)]
@@ -163,7 +163,7 @@ class SuggestionScopeTest(unittest.TestCase):
         bloc = check_couche0.bloc_scope([fichier("core/net/Http.kt")])
         self.assertTrue(bloc.startswith("## Scope"))
         self.assertIn("- `core/net/Http.kt`", bloc)
-        # Le garde doit accepter ce qu'il vient de suggérer.
+        # The guard must accept what it just suggested.
         self.assertEqual(check_couche0.parse_scope(bloc), ["core/net/Http.kt"])
 
     def test_le_bloc_suggere_satisfait_le_controle(self):

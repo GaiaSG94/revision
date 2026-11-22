@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests ciblés de union_journal.py — bibliothèque standard uniquement.
+"""Targeted tests for union_journal.py — standard library only.
 
 Lance : python3 -m unittest test_union_journal -v
 (depuis .github/fireworks/).
@@ -15,7 +15,7 @@ import union_journal
 
 
 def _scratch_repo(test):
-    """Dépôt git réel en temp, cwd dedans, nettoyé après. Rend run()."""
+    """Real git repo in temp, cwd inside, cleaned afterwards. Returns run()."""
     repo = tempfile.mkdtemp(prefix="fw-union-")
     test.addCleanup(shutil.rmtree, repo, True)
     old = os.getcwd()
@@ -46,20 +46,20 @@ def _commit(run, files, message):
 
 
 class UnionAjoutsTest(unittest.TestCase):
-    """Journaux : deux entrées écrites en tête se réunissent sans modèle."""
+    """Logs: two head-written entries are united without a model."""
 
     def test_deux_ajouts_en_tete(self):
-        texte = ("# Journal\n\n"
-                 "<<<<<<< HEAD\n## Entrée main\n- fait A\n"
+        texte = ("# Log\n\n"
+                 "<<<<<<< HEAD\n## Main entry\n- did A\n"
                  "||||||| base\n"
-                 "=======\n## Entrée branche\n- fait B\n"
-                 ">>>>>>> 3e0e33b\n\n## Plus ancien\n")
+                 "=======\n## Branch entry\n- did B\n"
+                 ">>>>>>> 3e0e33b\n\n## Older\n")
         self.assertEqual(union_journal.union_sans_perte(texte),
-                         "# Journal\n\n## Entrée main\n- fait A\n"
-                         "## Entrée branche\n- fait B\n\n## Plus ancien\n")
+                         "# Log\n\n## Main entry\n- did A\n"
+                         "## Branch entry\n- did B\n\n## Older\n")
 
     def test_ligne_commune_modifiee_refusee(self):
-        # Une ligne de base remplacée des deux côtés : vrai désaccord.
+        # A base line replaced on both sides: real disagreement.
         texte = ("<<<<<<< HEAD\nversion main\n"
                  "||||||| base\nversion commune\n"
                  "=======\nversion branche\n>>>>>>> x\n")
@@ -76,7 +76,7 @@ class UnionAjoutsTest(unittest.TestCase):
 
 
 class ResoudreAjoutsTest(unittest.TestCase):
-    """Bout en bout sur un vrai rebase : CHANGELOG.md réuni, code au modèle."""
+    """End-to-end on a real rebase: CHANGELOG.md united, code to the model."""
 
     def _conflit(self, chemin, base, nous, eux):
         run = _scratch_repo(self)
@@ -93,18 +93,18 @@ class ResoudreAjoutsTest(unittest.TestCase):
         return run
 
     def test_changelog_reuni_sans_modele(self):
-        # Non-régression 29/10 : #215 rebasée six fois sur CHANGELOG.md, une
-        # saisine LLM (et son quota) par rebase.
-        self._conflit("CHANGELOG.md", "# Journal\n\n## Ancien\n- vieux\n",
-                      "# Journal\n\n## Branche\n- B\n\n## Ancien\n- vieux\n",
-                      "# Journal\n\n## Master\n- M\n\n## Ancien\n- vieux\n")
+        # Non-regression 29/10: #215 rebased six times over CHANGELOG.md, one
+        # LLM invocation (and its quota) per rebase.
+        self._conflit("CHANGELOG.md", "# Log\n\n## Older\n- old\n",
+                      "# Log\n\n## Branch\n- B\n\n## Older\n- old\n",
+                      "# Log\n\n## Master\n- M\n\n## Older\n- old\n")
         self.assertTrue(union_journal.resoudre_ajouts("CHANGELOG.md"))
         self.assertEqual(_non_fusionnes(), [])
         with open("CHANGELOG.md") as fh:
             contenu = fh.read()
         self.assertIn("## Master", contenu)
-        self.assertIn("## Branche", contenu)
-        self.assertIn("- vieux", contenu)
+        self.assertIn("## Branch", contenu)
+        self.assertIn("- old", contenu)
         self.assertNotIn("<<<<<<<", contenu)
 
     def test_fichier_hors_journal_rend_la_main(self):

@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Quota de saisines du modèle : empreintes, cooldown, plafonds.
+"""Model invocation quota: fingerprints, cooldown, caps.
 
-Les runners changent d'un passage à l'autre : les empreintes vivent dans
-`~/.cache/fireworks-agent`, jamais dans le clone. Deux plafonds : global
-(`SPAWN_CAP` par heure) et par PR (`SAISINES_PR_MAX` en 30 min). Le second est
-né du 29/10 : #215, rebasée en boucle, a mangé tout le quota horaire et l'agent
-s'est tu pour les autres PR.
+Runners change from one pass to the next: fingerprints live in
+`~/.cache/fireworks-agent`, never in the clone. Two caps: global
+(`SPAWN_CAP` per hour) and per PR (`SAISINES_PR_MAX` in 30 min). The second
+was born on 29/10: #215, rebased in a loop, consumed the whole hourly quota
+and the agent went silent for other PRs.
 
-Bibliothèque standard uniquement. Importé par `conflict_agent.py`, qui le
-charge depuis `origin/main` (voir `_charger`) : le module peut manquer sur un
-déploiement ancien, l'appelant gère alors l'absence.
+Standard library only. Imported by `conflict_agent.py`, which loads it
+from `origin/main` (see `_charger`): the module may be missing on an older
+deployment, in which case the caller handles the absence.
 """
 
 import os
@@ -23,7 +23,7 @@ SAISINES_PR_FENETRE_S = 30 * 60
 
 
 class Saisine(Exception):
-    """Rien à faire : l'appelant saute la PR sans bruit (exit 2)."""
+    """Nothing to do: the caller skips the PR silently (exit 2)."""
 
 
 def cache_dir():
@@ -37,7 +37,7 @@ def stamp_path(pr, sha):
 
 
 def gc_stamps(now):
-    """Purge les empreintes de plus d'un jour."""
+    """Purges fingerprints older than one day."""
     jour_avant = now - 86_400
     for name in os.listdir(cache_dir()):
         if not name.endswith(".stamp"):
@@ -51,7 +51,7 @@ def gc_stamps(now):
 
 
 def _recentes(prefixe, cutoff):
-    """Empreintes dont le préfixe commence par `prefixe` et récentes."""
+    """Fingerprints whose prefix starts with `prefixe` and that are recent."""
     total = 0
     for name in os.listdir(cache_dir()):
         if not name.startswith(prefixe) or not name.endswith(".stamp"):
@@ -65,12 +65,12 @@ def _recentes(prefixe, cutoff):
 
 
 def recent_runs(now):
-    """Nombre de saisines dans la fenêtre glissante."""
+    """Number of invocations in the sliding window."""
     return _recentes("pr-", now - SPAWN_WINDOW_S)
 
 
 def saisines_pr(pr, now):
-    """Saisines récentes pour CETTE PR, toutes têtes confondues (fenêtre)."""
+    """Recent invocations for THIS PR, across all heads (window)."""
     return _recentes("pr-%s-" % pr, now - SAISINES_PR_FENETRE_S)
 
 
@@ -87,18 +87,18 @@ def touch_stamp(pr, sha):
 
 
 def autoriser(pr, sha):
-    """Lève Saisine si le modèle ne doit pas être appelé maintenant.
+    """Raises Saisine if the model must not be called now.
 
-    Séparé de la lecture du conflit pour que l'union déterministe des journaux
-    (gratuite) ne soit jamais bloquée par un plafond d'appels.
+    Separate from conflict reading so that the deterministic union of logs
+    (free) is never blocked by a call cap.
     """
     maintenant = time.time()
     if has_fresh_stamp(pr, sha, maintenant):
-        raise Saisine("saisine récente pour %s, cooldown" % sha[:12])
+        raise Saisine("recent invocation for %s, cooldown" % sha[:12])
     if recent_runs(maintenant) >= SPAWN_CAP:
-        raise Saisine("plafond de %d saisines/h atteint" % SPAWN_CAP)
+        raise Saisine("cap of %d invocations/h reached" % SPAWN_CAP)
     if saisines_pr(pr, maintenant) >= SAISINES_PR_MAX:
-        raise Saisine("%d saisines en %d min pour cette PR : désaccord de fond, "
-                      "main humaine"
+        raise Saisine("%d invocations in %d min for this PR: fundamental disagreement, "
+                      "human hand"
                       % (SAISINES_PR_MAX, SAISINES_PR_FENETRE_S // 60))
     touch_stamp(pr, sha)

@@ -1,126 +1,123 @@
-# Crash test — 12 novembre 2026
+# Crash test — 12 November 2026
 
-Objectif : vérifier que le produit ne casse ni sur des **données hostiles**, ni sur le
-**volume**, ni en cas de **panne**. Trois volets, tous automatisés sauf le dernier.
+Goal: verify that the product breaks neither on **hostile data**, nor under **volume**, nor in case
+of **failure**. Three parts, all automated except the last one.
 
-Résumé : **75 tests de crash ajoutés** (171 tests au total), **8 défauts réels trouvés et
-corrigés**, un comportement d'infrastructure documenté honnêtement (quota best-effort).
+Summary: **75 crash tests added** (171 tests in total), **8 real defects found and fixed**, plus one
+honestly documented infrastructure behaviour (best-effort quota).
 
 ---
 
-## Volet 1 — Données hostiles (`tests/crash/modele-hostile.test.ts`)
+## Part 1 — Hostile data (`tests/crash/modele-hostile.test.ts`)
 
-17 payloads adverses × 3 points d'entrée (extraction, analyse fusionnée, classification) = 53 cas.
-Payloads : JSON tronqué, pas-JSON, tableau au lieu d'objet, `null` partout, types inversés,
-confiances absurdes (`-5`, `999`, `NaN`, `"0.9"`), codes inconnus (`E42`, `""`, `null`, `12`),
-zones hors cadre (`x: -3`, `largeur: 1e9`, `NaN`, `Infinity`), ligne de **100 Ko**,
-**5 000 annotations**, champs inconnus, injection de prompt, markdown autour du JSON.
+17 adversarial payloads × 3 entry points (extraction, merged analysis, classification) = 53 cases.
+Payloads: truncated JSON, non-JSON, an array instead of an object, `null` everywhere, inverted
+types, absurd confidences (`-5`, `999`, `NaN`, `"0.9"`), unknown codes (`E42`, `""`, `null`, `12`),
+out-of-frame zones (`x: -3`, `width: 1e9`, `NaN`, `Infinity`), a **100 KB** line,
+**5,000 annotations**, unknown fields, prompt injection, markdown around the JSON.
 
-**Invariants exigés** : aucune exception autre qu'`ErreurLLM` ; aucun code hors taxonomie ;
-confiance dans [0,1] et finie ; textes et listes bornés ; zones assainies ou écartées ;
-une copie sans annotation valide reste « propre » (RNF-04).
+**Required invariants**: no exception other than `ErreurLLM`; no code outside the taxonomy;
+confidence in [0,1] and finite; bounded texts and lists; sanitised or discarded zones; a paper
+with no valid annotation remains "clean" (RNF-04).
 
-### Défauts trouvés et corrigés
+### Defects found and fixed
 
-| # | Défaut | Impact réel | Correctif |
+| # | Defect | Real impact | Fix |
 |---|---|---|---|
-| 1 | Ligne non bornée : un modèle pouvait rendre 100 Ko de texte | Carte de diagnostic illisible, DOM énorme | `tronquer()` à 300 caractères, ellipse à la fin |
-| 2 | Liste non bornée : 5 000 annotations acceptées | Gel du rendu (5 000 cartes + 5 000 rectangles) | plafond `MAX_ANNOTATIONS = 50` |
-| 3 | **Une annotation invalide faisait rejeter toute la réponse** | Une zone à `NaN` suffisait à perdre une copie entière | parsing **élément par élément** (`listeTolerante`) : l'élément fautif est écarté, pas le lot |
-| 4 | Zones non assainies | `x: -3` ou `largeur: 1e9` → rectangle hors écran, mise en page cassée | `zoneAssainie()` : nombres finis, ramenés dans [0,1], largeur/hauteur contenues ; sinon zone écartée et l'annotation reste valable |
-| 5 | Corps de réponse non-JSON sur un 200 | `SyntaxError` nue → message brut en anglais dans l'UI | traduction en `ErreurLLM` « Réponse du proxy illisible » |
-| 6 | Verdict de garde-fou absent/illisible | silence = exercice servi sans vérification | tout champ manquant vaut `false` : **un verdict illisible est un refus** |
-| 8 | **Attente non bornée** : 6 modèles × 90 s de timeout proxy = jusqu'à 9 minutes avant de rendre la main | l'utilisateur reste devant un écran d'analyse sans fin | timeout de 60 s **par appel** (`AbortSignal.timeout`) + **budget global de 130 s** sur toute la chaîne, puis message explicite proposant la démonstration |
+| 1 | Unbounded line: a model could return 100 KB of text | Unreadable diagnosis card, huge DOM | `tronquer()` to 300 characters, ellipsis at the end |
+| 2 | Unbounded list: 5,000 annotations accepted | Rendering freeze (5,000 cards + 5,000 rectangles) | `MAX_ANNOTATIONS = 50` cap |
+| 3 | **One invalid annotation rejected the whole answer** | A single `NaN` zone lost an entire paper | parsing **element by element** (`listeTolerante`): the faulty element is dropped, not the batch |
+| 4 | Zones not sanitised | `x: -3` or `width: 1e9` → off-screen rectangle, broken layout | `zoneAssainie()`: finite numbers, clamped to [0,1], bounded width/height; otherwise the zone is dropped and the annotation stays valid |
+| 5 | Non-JSON response body on a 200 | bare `SyntaxError` → raw English message in the UI | translated into `ErreurLLM` "Unreadable proxy response" |
+| 6 | Missing/unreadable guardrail verdict | silence = exercise served without verification | every missing field counts as `false`: **an unreadable verdict is a refusal** |
+| 8 | **Unbounded wait**: 6 models × 90 s proxy timeout = up to 9 minutes before yielding | the user stares at an endless analysis screen | 60 s timeout **per call** (`AbortSignal.timeout`) + **130 s global budget** for the whole chain, then an explicit message offering the demo |
 
-Le nouveau module `src/domain/tolerance.ts` centralise ces règles (bornes, assainissement,
-plafonds) : aucune duplication entre l'extraction, l'analyse fusionnée, la classification et la
-seconde passe.
+The new `src/domain/tolerance.ts` module centralises these rules (bounds, sanitisation, caps): no
+duplication between extraction, merged analysis, classification and the second pass.
 
 ---
 
-## Volet 2 — Volume (`tests/crash/volume.test.ts`)
+## Part 2 — Volume (`tests/crash/volume.test.ts`)
 
-Générateur déterministe (graine fixe, donc aucun test qui flotte).
+Deterministic generator (fixed seed, so no flaky tests).
 
-| Scénario | Résultat |
+| Scenario | Result |
 |---|---|
-| 1 000 copies × 4 fautes agrégées | **< 1 s** (mesuré ~50 ms), sommes des parts = 1,000 ± 0,001, aucun NaN |
-| Classement + phrase de synthèse sur 1 000 copies | bornés (≤ 12 lignes, phrase < 200 caractères) |
-| Exports CSV / fiche Markdown sur 1 000 copies | **ne grossissent pas** : CSV ≤ 14 lignes, fiche < 40 lignes (les 5 dernières copies seulement) |
-| Trajectoire sur 1 000 copies | série complète, tendance cohérente |
-| Mode prof, paquet de 200 copies × 5 fautes | < 300 ms, total exact, 200 entrées |
-| Un diagnostic de 5 000 fautes brutes | dominant correct, E99 hors profil mais signalé |
-| Confiances extrêmes (`MAX_VALUE`, `MIN_VALUE`, négatif) | aucune propagation de NaN/Infinity |
+| 1,000 papers × 4 mistakes aggregated | **< 1 s** (measured ~50 ms), shares sum to 1.000 ± 0.001, no NaN |
+| Ranking + summary sentence on 1,000 papers | bounded (≤ 12 lines, sentence < 200 characters) |
+| CSV / Markdown sheet exports on 1,000 papers | **do not grow**: CSV ≤ 14 lines, sheet < 40 lines (last 5 papers only) |
+| Trajectory on 1,000 papers | complete series, coherent trend |
+| Teacher mode, batch of 200 papers × 5 mistakes | < 300 ms, exact total, 200 entries |
+| One diagnostic with 5,000 raw mistakes | correct dominant, E99 out of profile but flagged |
+| Extreme confidences (`MAX_VALUE`, `MIN_VALUE`, negative) | no NaN/Infinity propagation |
 
-### Vérification en navigateur réel (site publié)
+### Verification in a real browser (published site)
 
-1 000 diagnostics (**1,37 Mo**) injectés dans IndexedDB sur
-<https://gaiasg94.github.io/errata/>, puis ouverture de l'écran Profil :
+1,000 diagnostics (**1.37 MB**) injected into IndexedDB on the publicly deployed site, then the
+Profile screen opened:
 
-- chargement + rendu : **412 ms** (DOMContentLoaded 164 ms)
-- tas JS : **6 Mo**
-- **0** occurrence de `NaN` ou `undefined` dans le DOM rendu
-- **0** erreur en console
-- synthèse correcte : « 10 % de tes erreurs : cas particulier oublié », 8 types listés
+- load + render: **412 ms** (DOMContentLoaded 164 ms)
+- JS heap: **6 MB**
+- **0** occurrence of `NaN` or `undefined` in the rendered DOM
+- **0** console errors
+- correct summary: "10% of your mistakes: forgotten special case", 8 types listed
 
-Piège rencontré : la base IndexedDB d'`idb-keyval` s'appelle **`keyval-store`** (et non `keyval`) ;
-la première injection est partie dans une base créée pour l'occasion, et l'écran affichait
-légitimement l'état vide.
+Pitfall encountered: the `idb-keyval` IndexedDB database is called **`keyval-store`** (not
+`keyval`); the first injection went into a database created for the occasion, and the screen
+legitimately showed the empty state.
 
-### Défaut trouvé et corrigé
+### Defect found and fixed
 
-| # | Défaut | Correctif |
+| # | Defect | Fix |
 |---|---|---|
-| 7 | Un diagnostic abîmé en stockage local (`erreurs: null`) faisait lever l'agrégation | `agreger()` ignore un diagnostic illisible ; `chargerDiagnostics()` et `chargerProfil()` **filtrent et reconstruisent** au chargement (écriture interrompue, quota navigateur, données d'une version antérieure) |
+| 7 | A damaged diagnostic in local storage (`erreurs: null`) made aggregation throw | `agreger()` ignores an unreadable diagnostic; `chargerDiagnostics()` and `chargerProfil()` **filter and rebuild** on load (interrupted write, browser quota, data from an older version) |
 
 ---
 
-## Volet 3 — Pannes (`tests/crash/pannes.test.ts` + tests réels sur le proxy)
+## Part 3 — Failures (`tests/crash/pannes.test.ts` + real tests on the proxy)
 
-### Simulé (hors ligne)
+### Simulated (offline)
 
-| Scénario | Comportement attendu et vérifié |
+| Scenario | Expected and verified behaviour |
 |---|---|
-| Réseau coupé (`fetch` rejette) | **1 seul appel**, `ErreurLLM` « Réseau indisponible » — pas de boucle |
-| Chaîne entière en 503 | exactement **6 appels** (un par modèle), message réel de l'amont remonté |
-| Panachage 503 / 402 / 500 / 504 puis succès | aboutit au 5ᵉ modèle, **5 appels** |
-| 429 « quota du proxy » | **1 appel**, message proposant le BYOK |
-| 429 amont puis 503 partout | borne à **≤ 7 appels** (une seconde chance par modèle), pas de tempête |
-| Corps HTML sur un 200 | `ErreurLLM`, jamais `SyntaxError` |
-| Génération d'exercice en panne | l'erreur remonte (l'orchestrateur la traduit en message honnête) |
-| Verdicts de seconde passe hostiles (index 99, −3, code inconnu) | liste **intacte en longueur**, seule la faute visée change, code inconnu → E99 |
-| Seconde passe en panne | les fautes d'origine sont conservées telles quelles |
+| Network cut (`fetch` rejects) | **1 call only**, `ErreurLLM` "Network unavailable" — no loop |
+| Whole chain on 503 | exactly **6 calls** (one per model), real upstream message propagated |
+| Mix of 503 / 402 / 500 / 504 then success | reaches the 5th model, **5 calls** |
+| 429 "proxy quota" | **1 call**, message offering BYOK |
+| Upstream 429 then 503 everywhere | bounded to **≤ 7 calls** (one second chance per model), no storm |
+| HTML body on a 200 | `ErreurLLM`, never `SyntaxError` |
+| Exercise generation fails | the error propagates (the orchestrator turns it into an honest message) |
+| Hostile second-pass verdicts (index 99, −3, unknown code) | list **intact in length**, only the targeted mistake changes, unknown code → E99 |
+| Second pass fails | the original mistakes are kept as is |
 
-### Réel, sur le proxy déployé (Modal)
+### Real, on the deployed proxy (Modal)
 
-- **20 requêtes `/health` en parallèle** : 20 × 200, ~0,87 s chacune — pas de file d'attente.
-- **25 appels `/analyze` en parallèle** (texte court) : 14 succès, 2 timeouts amont (504),
-  2 erreurs internes Modal (500, « function was terminated by signal »), le reste en 200.
-  Les statuts 500/504 font partie de la chaîne de repli côté client : ils sont rejoués.
-- **Corps de 16 Mo** : `413` et « Photo trop lourde (15 Mo max après encodage) » en 4,5 s — la
-  garde de taille tient en production.
-- **Image réelle de 476 Ko en pleine saturation** : `504` après 90 s (timeout du proxy sur
-  l'amont). C'est ce cas précis qui a révélé le défaut n° 8 : sans budget global, le navigateur
-  aurait enchaîné six fois 90 s.
+- **20 parallel `/health` requests**: 20 × 200, ~0.87 s each — no queue.
+- **25 parallel `/analyze` calls** (short text): 14 successes, 2 upstream timeouts (504),
+  2 internal Modal errors (500, "function was terminated by signal"), the rest in 200.
+  The 500/504 statuses are part of the client-side fallback chain: they are replayed.
+- **16 MB body**: `413` and "Photo too heavy (15 MB max after encoding)" in 4.5 s — the size guard
+  holds in production.
+- **Real 476 KB image under full saturation**: `504` after 90 s (proxy timeout on the upstream).
+  This exact case revealed defect #8: without a global budget, the browser would have chained six
+  90 s waits.
 
-**Constat honnête sur le quota** : aucun 429 n'a été observé sur 25 appels parallèles. Le quota est
-en mémoire **par conteneur** et Modal recycle ses instances sous charge (les deux 500 observés) :
-le plafond est donc **best-effort**, pas une garantie. C'est acceptable pour un garde-fou de
-démonstration, insuffisant pour un produit facturé. Les plafonds ont été divisés par le nombre de
-conteneurs (`PAR_IP_PAR_HEURE = 20 / 4`) pour que le total vu par un visiteur reste proche de
-l'objectif ; un vrai plafond exigerait un compteur partagé (KV, Upstash), donc un service tiers.
+**Honest finding on quota**: no 429 was observed across 25 parallel calls. The quota is in memory
+**per container** and Modal recycles instances under load (the two observed 500s): the cap is
+therefore **best-effort**, not a guarantee. Acceptable for a demonstration guard, insufficient for
+a paid product. The caps were divided by the number of containers (`PAR_IP_PAR_HEURE = 20 / 4`) so
+that the total seen by a visitor stays close to the target; a real cap would need a shared counter
+(KV, Upstash), hence a third-party service.
 
 ---
 
-## Ce que ce crash test ne couvre pas
+## What this crash test does not cover
 
-- **Le DOM** : les tests tournent en environnement Node, sans `jsdom`. Le rendu sous charge a donc
-  été vérifié **à la main dans un vrai navigateur** (volet 2), pas automatisé. Un test E2E rejouable
-  (Playwright/agent-browser) reste à ajouter — idée #94 de `docs/IDEES-100.md`.
-- **Les images réelles** : le corpus est synthétique. Le comportement sur un manuscrit réel, un
-  reflet, un pli ou une photo très floue n'est pas mesuré (protocole : `corpus/README.md`).
-- **La concurrence d'écritures IndexedDB** : deux analyses lancées en même temps sur le même
-  navigateur (double clic). Le bouton passe en `disabled` pendant l'analyse, mais ce n'est pas
-  testé automatiquement.
-- **Les coupures longues** : perte de réseau en plein appel, reprise, file d'attente hors ligne
-  (idée #62, non implémentée).
+- **The DOM**: tests run in a Node environment without `jsdom`. Rendering under load was therefore
+  verified **manually in a real browser** (part 2), not automated. A replayable E2E test
+  (Playwright/agent-browser) remains to be added — idea #94 in the pre-existing idea list.
+- **Real images**: the corpus is synthetic. Behaviour on a real handwritten paper, a reflection, a
+  fold or a very blurry photo is not measured (protocol: [`../corpus/README.md`](../corpus/README.md)).
+- **Concurrent IndexedDB writes**: two analyses started at the same time in the same browser
+  (double click). The button is `disabled` during analysis, but this is not tested automatically.
+- **Long outages**: network loss mid-call, recovery, offline queue (idea #62, not implemented).

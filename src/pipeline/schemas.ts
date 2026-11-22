@@ -1,14 +1,15 @@
 /**
- * Schémas et parseurs des réponses du modèle.
+ * Schemas and parsers for model responses.
  *
- * Deux principes, issus du crash test du 12/11 :
- *  1. **Rien n'entre sans passer d'ici** — un modèle qui répond à côté ne doit
- *     ni casser l'écran, ni inventer une catégorie hors taxonomie ;
- *  2. **Borner et assainir, jamais rejeter en bloc** — une annotation
- *     malformée coûte cette annotation, pas toute la copie ; les textes et les
- *     listes sont plafonnés pour que l'UI ne puisse pas geler.
+ * Two principles, from the crash test of 12/11:
+ *  1. **Nothing enters without passing through here** — a model that answers
+ *     off-topic must neither break the screen nor invent a category outside the
+ *     taxonomy;
+ *  2. **Bound and sanitize, never reject wholesale** — a malformed annotation
+ *     costs that annotation, not the whole paper; texts and lists are capped so
+ *     the UI cannot freeze.
  *
- * Le typage strict reste garanti en sortie : `Annotation`, `ErreurBrute`,
+ * Strict typing remains guaranteed on output: `Annotation`, `ErreurBrute`,
  * `Exercice`, `VerdictGardeFou`.
  */
 import { z } from 'zod'
@@ -24,7 +25,7 @@ import {
   zoneAssainie,
 } from '../domain/tolerance'
 
-/** Annotation + typage, telle que la rend l'appel fusionné. */
+/** Annotation + typing, as returned by the merged call. */
 export type AnnotationFusionnee = Annotation & {
   code: string
   confiance: number
@@ -46,7 +47,7 @@ function estObjet(valeur: unknown): valeur is Record<string, unknown> {
 function interpreterAnnotation(item: unknown): Annotation | null {
   if (!estObjet(item)) return null
   const annotation = texteAssaini(item.annotation, '')
-  if (!annotation) return null // rien à diagnostiquer sur une annotation vide
+  if (!annotation) return null // nothing to diagnose on an empty annotation
   const ligne = texteAssaini(item.ligne, '', MAX_LONGUEUR_LIGNE)
   const eleve = texteOptionnelAssaini(item.eleve)
   const attendu = texteOptionnelAssaini(item.attendu)
@@ -79,21 +80,21 @@ function interpreterFusionnee(item: unknown): AnnotationFusionnee | null {
   return { ...annotation, code: erreur.code, confiance: erreur.confiance, explication: erreur.explication }
 }
 
-/** Schémas conservés pour les tests et la documentation du contrat. */
+/** Schemas kept for tests and documentation of the contract. */
 export const schemaAnnotation = z.unknown().transform(interpreterAnnotation)
 export const schemaErreurBrute = z.unknown().transform(interpreterErreur)
 
 function objetBrut(texte: string, quoi: string): Record<string, unknown> {
   const json = extraireJson(texte)
   if (!estObjet(json) || Array.isArray(json)) {
-    throw new ErreurLLM(`Réponse du modèle invalide (${quoi}) : objet JSON attendu.`, 502)
+    throw new ErreurLLM(`Invalid model response (${quoi}): JSON object expected.`, 502)
   }
   return json
 }
 
 function copiePropreDe(brut: Record<string, unknown>, annotations: unknown[]): boolean {
-  // Une copie sans annotation exploitable est une copie propre, même si le
-  // modèle affirme le contraire : c'est la garantie RNF-04 (zéro faux positif).
+  // A paper with no usable annotation is a clean paper, even if the model says
+  // otherwise: this is the RNF-04 guarantee (zero false positives).
   return annotations.length === 0 || brut.copiePropre === true
 }
 
@@ -151,13 +152,13 @@ export function parserExercice(texte: string): ExerciceBrut {
   const enonce = texteAssaini(source.enonce, '')
   const solution = texteAssaini(source.solution, '')
   if (!enonce || !solution) {
-    throw new ErreurLLM('Réponse du modèle invalide (exercice) : énoncé ou solution absente.', 502)
+    throw new ErreurLLM('Invalid model response (exercise): missing prompt or solution.', 502)
   }
   const indices = plafonner(
     listeTolerante(source.indices, (item) => (typeof item === 'string' && item.trim() ? item.trim() : null)),
     4,
   )
-  const niveau = texteAssaini(source.niveau, 'lycée', 60)
+  const niveau = texteAssaini(source.niveau, 'high school', 60)
   return { enonce, indices, solution, typeTravaille: texteAssaini(source.typeTravaille, '', 10), niveau }
 }
 
@@ -172,8 +173,8 @@ export function parserVerdict(texte: string): VerdictGardeFou {
   const brut = objetBrut(texte, 'garde-fou')
   const valide = schemaVerdict.safeParse(brut)
   const source = (valide.success ? valide.data : brut) as Record<string, unknown>
-  // Un verdict absent ou illisible est un REFUS : on ne sert jamais un exercice
-  // dont la pertinence n'a pas pu être vérifiée.
+  // A missing or unreadable verdict is a REFUSAL: we never serve an exercise
+  // whose relevance could not be verified.
   return {
     travailleLeBonType: source.travailleLeBonType === true,
     neDonneLaSolutionOrigine: source.neDonneLaSolutionOrigine === true,

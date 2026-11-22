@@ -10,12 +10,12 @@ import { SectionLiens } from '../components/apropos/SectionLiens'
 import { PanneauSante } from '../components/PanneauSante'
 
 /**
- * Écran « Comment ça marche » : la page qui rend visible la valeur du produit —
- * pipeline et latences mesurées, taxonomie fermée et ses verrous, garde-fou de
- * l'exercice, confidentialité, chiffres sourcés, IA déclarée, liens publics.
+ * "How it works" screen: the page that makes the product's value visible —
+ * pipeline and measured latencies, closed taxonomy and its locks, exercise
+ * guardrail, privacy, sourced figures, declared AI, public links.
  *
- * Chaque section vit dans son propre fichier ; le sommaire et les titres
- * viennent de `catalogue.ts`, donc aucune chaîne n'est recopiée.
+ * Each section lives in its own file; the table of contents and titles come
+ * from `catalogue.ts`, so no string is copied.
  */
 export function CommentCaMarche() {
   return (

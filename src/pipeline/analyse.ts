@@ -1,15 +1,15 @@
 /**
- * Étape 3+4 fusionnées — un seul appel vision rend les annotations du
- * professeur ET leur typage.
+ * Steps 3+4 merged — a single vision call returns the teacher's annotations
+ * AND their typing.
  *
- * Pourquoi fusionner : mesuré le 11 novembre, chaque aller-retour avec l'amont
- * coûte 16 à 50 s (place de marché, modèles parfois sans capacité). Deux appels
- * séquentiels faisaient tomber le budget « photo → diagnostic » à 40-90 s. Un
- * seul appel le ramène vers les 20 s du cahier des charges (RNF-01).
+ * Why merge: measured on 11 November, each round trip with the upstream costs
+ * 16 to 50 s (marketplace, models sometimes out of capacity). Two sequential
+ * calls dropped the "photo → diagnosis" budget to 40-90 s. A single call brings
+ * it back to the ~20 s of the spec (RNF-01).
  *
- * Ce qui ne change pas : les **règles** restent locales. Le modèle propose des
- * codes et des confiances ; le seuil de 0,6, la rétrogradation en E99 et la
- * pondération nulle de E11 sont appliqués par `normaliserErreur`, jamais par lui.
+ * What does not change: the **rules** stay local. The model suggests codes and
+ * confidences; the 0.6 threshold, downgrade to E99 and zero weighting of E11
+ * are applied by `normaliserErreur`, never by it.
  */
 import promptMd from '../../prompts/analyse.md?raw'
 import { normaliserErreur } from '../domain/diagnostic'
@@ -31,7 +31,7 @@ export function messageAnalyse(): string {
   ].join(' ')
 }
 
-/** Convertit les annotations fusionnées en `Extraction` + fautes normalisées. */
+/** Converts the merged annotations into `Extraction` + normalized errors. */
 export function decouperAnalyse(brut: ReturnType<typeof parserAnalyse>): AnalyseFusionnee {
   const extraction: Extraction = {
     annotations: brut.annotations.map((a) => ({
@@ -44,7 +44,7 @@ export function decouperAnalyse(brut: ReturnType<typeof parserAnalyse>): Analyse
     copiePropre: brut.copiePropre,
     ...(brut.nomDetecte ? { nomDetecte: brut.nomDetecte } : {}),
   }
-  // Copie propre : aucune faute, quoi qu'ait écrit le modèle (RNF-04).
+  // Clean paper: no error, whatever the model wrote (RNF-04).
   const erreurs = extraction.copiePropre
     ? []
     : brut.annotations.map((a) =>
@@ -69,7 +69,7 @@ export async function analyserImage(
     user: messageAnalyse(),
     image: dataUrl,
     json: true,
-    temperature: 0.1,
+    temperevision: 0.1,
     maxTokens: 1600,
   })
   return decouperAnalyse(parserAnalyse(texte))

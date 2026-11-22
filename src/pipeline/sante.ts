@@ -1,42 +1,42 @@
 /**
- * Sonde du proxy edge — lot 2. Donne à l'utilisateur un signal honnête avant
- * qu'il ne lance une analyse : si l'amont est hors ligne, on l'annonce et on
- * propose la démonstration plutôt que de le laisser attendre 90 s un échec.
+ * Edge proxy probe — batch 2. Gives the user an honest signal before starting
+ * an analysis: if the upstream is offline, we say so and offer the demo rather
+ * than letting them wait 90 s for a failure.
  *
- * La sonde est un simple `GET /health` (le proxy Modal en expose un, CPU
- * uniquement). Aucune clé n'est envoyée, aucun quota consommé.
+ * The probe is a simple `GET /health` (the Modal proxy exposes one, CPU only).
+ * No key is sent, no quota consumed.
  */
 import { PROXY_PAR_DEFAUT } from '../domain/config'
 
 export type SanteProxy = 'ok' | 'ko' | 'inconnue'
 
 /**
- * 12 s et une seconde tentative : le proxy Modal fait du scale-to-zero, et un
- * démarrage à froid prend ~5 s. Avec un délai de 5 s, la sonde annonçait à tort
- * « modèle indisponible » sur un conteneur froid (constaté en navigateur).
+ * 12 s and a second attempt: the Modal proxy scales to zero, and a cold start
+ * takes ~5 s. With a 5 s timeout, the probe wrongly reported "model
+ * unavailable" on a cold container (observed in the browser).
  */
 const DELAI_SONDE_MS = 12_000
 const TENTATIVES = 2
 const PAUSE_ENTRE_ESSAIS_MS = 1500
 
-/** L'URL à sonder : on remplace `/analyze` (le POST) par `/health` (la sonde). */
+/** URL to probe: replace `/analyze` (the POST) with `/health` (the probe). */
 export function urlSante(proxy: string): string {
   const base = proxy.replace(/\/analyze\/?$/, '').replace(/\/+$/, '')
   return `${base}/health`
 }
 
 /**
- * Un proxy same-origin (ou une adresse vide) n'a pas de `/health` déployé :
- * sonder donnerait un 404 de l'hébergeur statique, donc un « indisponible »
- * mensonger. Bug réel du 11/11 : les réglages chargés après le premier rendu
- * laissaient une chaîne vide, et la sonde partait sur `https://<pages>/health`.
+ * A same-origin proxy (or an empty address) has no deployed `/health`: probing
+ * would give a 404 from the static host, hence a false "unavailable". Real bug
+ * of 11/11: settings loaded after the first render left an empty string, and
+ * the probe went to `https://<pages>/health`.
  */
 function estSondable(proxy: string): boolean {
-  // Seule une adresse absolue possède un `/health` atteignable en CORS. Une
-  // adresse vide ou relative (repli same-origin d'un déploiement Vercel/Worker)
-  // ne se sonde pas : on rend « inconnue » plutôt qu'un « indisponible » faux.
-  // Attention : PROXY_PAR_DEFAUT est ABSOLU en production (VITE_PROXY_URL est
-  // injecté au build) — il doit donc rester sondable.
+  // Only an absolute address has a `/health` reachable over CORS. An empty or
+  // relative address (the same-origin fallback of a Vercel/Worker deployment)
+  // is not probed: we return "inconnue" rather than a false "unavailable".
+  // Note: PROXY_PAR_DEFAUT is ABSOLUTE in production (VITE_PROXY_URL is injected
+  // at build time) — it must therefore remain probeable.
   return /^https?:\/\//.test(proxy)
 }
 
@@ -59,10 +59,10 @@ async function sonderUneFois(proxy: string): Promise<SanteProxy> {
 export type EtatModeles = { chaine: string[]; disjoncteur: Record<string, number> }
 
 /**
- * Sonde la disponibilité des modèles (idée 5) : le proxy tient un disjoncteur
- * par modèle (cooldown après un 402/503). On réordonne la chaîne pour commencer
- * par un modèle vivant — chaque modèle mort évité, c'est 1 à 2 s de gagnées.
- * Aucun appel modèle : on lit l'état du proxy, donc c'est gratuit.
+ * Probes model availability (idea 5): the proxy holds a circuit breaker per
+ * model (cooldown after a 402/503). We reorder the chain to start with a live
+ * model — every dead model avoided saves 1 to 2 s. No model call: we read the
+ * proxy's state, so it is free.
  */
 export async function sonderModeles(proxy = PROXY_PAR_DEFAUT): Promise<string[] | null> {
   if (!estSondable(proxy)) return null
@@ -78,7 +78,7 @@ export async function sonderModeles(proxy = PROXY_PAR_DEFAUT): Promise<string[] 
   }
 }
 
-/** Modèles vivants d'abord (dans l'ordre de la chaîne), modèles en cooldown ensuite. */
+/** Live models first (in chain order), cooling-down models afterwards. */
 export function reordonner(etat: EtatModeles): string[] | null {
   if (!Array.isArray(etat?.chaine) || etat.chaine.length === 0) return null
   const morts = etat.disjoncteur && typeof etat.disjoncteur === 'object' ? etat.disjoncteur : {}

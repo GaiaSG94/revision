@@ -1,14 +1,14 @@
 name: prewarm
 
-# Pré-warm du proxy (idée 3) : Modal fait du scale-to-zero après 60 s d'inactivité
-# et un conteneur froid met 3 à 5 s à répondre — mesuré le 11/11, où la sonde de
-# santé de l'app (timeout 5 s) annonçait à tort « modèle indisponible ».
+# Proxy pre-warm (idea 3): Modal scales to zero after 60 s of inactivity
+# and a cold container takes 3 to 5 s to answer — measured on 11/11, when
+# the app's health probe (5 s timeout) wrongly reported "model unavailable".
 #
-# Un ping toutes les 5 minutes garde un conteneur chaud, donc la première
-# analyse d'un visiteur ne paie plus le démarrage. Tourne sur un runner hébergé
-# (gratuit pour un dépôt public) pour ne pas occuper les runners auto-hébergés.
+# A ping every 5 minutes keeps a container warm, so the first analysis
+# of a visitor no longer pays for startup. Runs on a hosted runner
+# (free for a public repo) to avoid occupying self-hosted runners.
 #
-# Aucune clé n'est nécessaire : /health ne touche pas InferHub.
+# No key is needed: /health does not touch InferHub.
 on:
   schedule:
     - cron: '*/5 * * * *'
@@ -27,19 +27,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Ping du proxy
+      - name: Proxy ping
         shell: bash
         run: |
           set -uo pipefail
-          URL="${{ vars.RATURE_PROXY_URL }}"
+          URL="${{ vars.REVISION_PROXY_URL }}"
           SANTE="${URL%/analyze}/health"
-          echo "sonde : $SANTE"
+          echo "probe: $SANTE"
           for essai in 1 2 3; do
-            code=$(curl -s -o /tmp/reponse.json -w '%{http_code}' --max-time 30 "$SANTE" || echo 000)
-            echo "essai $essai : HTTP $code"
+            code=$(curl -s -o /tmp/response.json -w '%{http_code}' --max-time 30 "$SANTE" || echo 000)
+            echo "attempt $essai: HTTP $code"
             [ "$code" = "200" ] && break
             sleep 5
           done
-          cat /tmp/reponse.json || true
-          # Jamais rouge : un pré-warm raté ne doit pas bloquer une PR ni alerter.
+          cat /tmp/response.json || true
+          # Never red: a failed pre-warm must not block a PR or alert.
           exit 0

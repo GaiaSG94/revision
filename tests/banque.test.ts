@@ -4,44 +4,44 @@ import { CODES_ERREUR, libelleDe } from '../src/domain/taxonomy'
 import type { CodeErreur } from '../src/domain/taxonomy'
 
 /**
- * La banque remplace deux appels réseau : si un exercice est hors sujet, le
- * produit sert un exercice qui ne travaille pas la faille de l'élève. Ces tests
- * sont donc le garde-fou de la banque — ils vérifient que chaque énoncé fait
- * bien faire le geste de son type.
+ * The bank replaces two network calls: if an exercise is off-topic, the product
+ * serves an exercise that does not work on the student's weakness. These tests
+ * are therefore the bank's safeguard — they check that each prompt really makes
+ * the student perform its type's move.
  */
-/** Limites de mots : « positif ou nul » n'est pas un mot culpabilisant. */
+/** Word limits: "positive or zero" is not a blameful word. */
 const MOTS_INTERDITS = [
   /tu t'es trompé/,
   /tu as faux/,
-  // « nul » retiré : en maths, « positif ou nul » est un mot légitime ; les
-  // autres termes sont sans ambiguïté.
+  // "zero" removed: in maths, "positive or zero" is a legitimate phrase; the
+  // other terms are unambiguous.
   /\bgrave\b/,
   /\bhonte\b/,
   /\bincapable\b/,
   /toujours faux/,
 ]
 
-/** Mot-clé du geste attendu dans l'énoncé, par code. */
+/** Keyword of the expected move in the prompt, by code. */
 const SIGNATURES: Record<string, RegExp> = {
-  E01: /-\s*\d*\s*\(/, // un facteur négatif devant une parenthèse
-  E02: /\d?\(?x?\)?\(/, // une parenthèse à développer
-  E03: /²|\) ?\(/, // un carré ou un produit de deux binômes
-  E04: /\d\/\d/, // des fractions
-  E05: /domain|x² = |√\(/, // valeur interdite, deux racines, domaine
-  E06: /[²³ⁿ]|x⁵|÷ x/, // des exposants
-  E07: /√/, // des racines
-  E08: /=/, // une équation à transposer
-  E09: /exact|arrondi/i, // la précision
-  E10: /unit|m²|km\/h|Convert/i, // les unités
-  E11: /Copy/i, // la recopie
-  E12: /Show|Prove|justif/i, // la justification
+  E01: /-\s*\d*\s*\(/, // a negative factor before parentheses
+  E02: /\d?\(?x?\)?\(/, // parentheses to expand
+  E03: /²|\) ?\(/, // a square or a product of two binomials
+  E04: /\d\/\d/, // fractions
+  E05: /domain|x² = |√\(/, // forbidden value, two roots, domain
+  E06: /[²³ⁿ]|x⁵|÷ x/, // exponents
+  E07: /√/, // roots
+  E08: /=/, // an equation to transpose
+  E09: /exact|arrondi/i, // precision
+  E10: /unit|m²|km\/h|Convert/i, // units
+  E11: /Copy/i, // copying
+  E12: /Show|Prove|justif/i, // justification
 }
 
-describe('banque d’exercices locale (idée 1)', () => {
-  it('couvre les 12 codes avec 3 exercices et les 3 difficultés', () => {
+describe('local exercise bank (idea 1)', () => {
+  it('covers the 12 codes with 3 exercises and the 3 difficulty levels', () => {
     for (const code of CODES_ERREUR) {
       const liste = BANQUE[code]
-      expect(liste, `${code} absent de la banque`).toHaveLength(3)
+      expect(liste, `${code} missing from the bank`).toHaveLength(3)
       expect(liste.map((e) => e.difficulte).sort()).toEqual([1, 2, 3])
       for (const exercice of liste) {
         expect(exercice.code).toBe(code)
@@ -50,13 +50,13 @@ describe('banque d’exercices locale (idée 1)', () => {
     }
   })
 
-  it('identifiants uniques sur toute la banque', () => {
+  it('unique identifiers across the whole bank', () => {
     const ids = CODES_ERREUR.flatMap((code) => BANQUE[code].map((e) => e.id))
     expect(new Set(ids).size).toBe(ids.length)
     expect(ids).toHaveLength(36)
   })
 
-  it('aucun champ vide, un ou deux indices, une solution qui explique', () => {
+  it('no empty field, one or two hints, a solution that explains', () => {
     for (const code of CODES_ERREUR) {
       for (const exercice of BANQUE[code]) {
         expect(exercice.enonce.trim().length).toBeGreaterThan(8)
@@ -65,62 +65,62 @@ describe('banque d’exercices locale (idée 1)', () => {
         expect(exercice.indices.length).toBeGreaterThanOrEqual(1)
         expect(exercice.indices.length).toBeLessThanOrEqual(2)
         expect(exercice.indices[0]!.length).toBeGreaterThan(8)
-        // Un indice ne doit pas donner la réponse finale.
+        // A hint must not give away the final answer.
         expect(exercice.indices[0]).not.toBe(exercice.solution)
       }
     }
   })
 
-  it('chaque énoncé fait bien faire le geste de son type', () => {
+  it('each prompt really makes the student perform its type’s move', () => {
     for (const code of CODES_ERREUR) {
       const signature = SIGNATURES[code]!
       for (const exercice of BANQUE[code]) {
         expect(
           signature.test(exercice.enonce),
-          `${exercice.id} (${libelleDe(code)}) : « ${exercice.enonce} » ne correspond pas au geste attendu`,
+          `${exercice.id} (${libelleDe(code)}): "${exercice.enonce}" does not match the expected move`,
         ).toBe(true)
       }
     }
   })
 
-  it('ton bienveillant : aucun mot culpabilisant', () => {
+  it('caring tone: no blameful word', () => {
     for (const code of CODES_ERREUR) {
       for (const exercice of BANQUE[code]) {
         const texte = `${exercice.enonce} ${exercice.indices.join(' ')} ${exercice.solution} ${exercice.piege}`.toLowerCase()
         for (const mot of MOTS_INTERDITS) {
-          expect(mot.test(texte), `${exercice.id} contient « ${mot.source} »`).toBe(false)
+          expect(mot.test(texte), `${exercice.id} contains "${mot.source}"`).toBe(false)
         }
       }
     }
   })
 
-  it('E99 n’a pas d’exercice : on ne travaille pas une faute non typée', () => {
+  it('E99 has no exercise: we do not work on an untyped error', () => {
     expect(exercicesDe('E99')).toEqual([])
     expect(exercicesDe('ZZZ' as CodeErreur)).toEqual([])
     expect(exercicePour('E99')).toBeUndefined()
   })
 
-  it('exercicePour respecte la difficulté et évite les exercices déjà vus', () => {
+  it('exercicePour respects difficulty and avoids already-seen exercises', () => {
     expect(exercicePour('E01', { difficulte: 2 })?.difficulte).toBe(2)
     const premier = exercicePour('E04', { graine: 0 })!
     const second = exercicePour('E04', { graine: 0, exclure: [premier.id] })!
     expect(second.id).not.toBe(premier.id)
   })
 
-  it('déterministe à options égales', () => {
+  it('deterministic for equal options', () => {
     const a = exercicePour('E06', { graine: 1 })
     const b = exercicePour('E06', { graine: 1 })
     expect(a).toEqual(b)
   })
 
-  it('retombe sur un exercice du même type quand tout est exclu', () => {
+  it('falls back to an exercise of the same type when everything is excluded', () => {
     const tous = BANQUE.E07.map((e) => e.id)
     const resultat = exercicePour('E07', { exclure: tous })
     expect(resultat).toBeDefined()
     expect(resultat!.code).toBe('E07')
   })
 
-  it('la conversion produit un exercice vérifié, marqué comme venant de la banque', () => {
+  it('conversion produces a verified exercise, marked as coming from the bank', () => {
     const exercice = exerciceVerifie(BANQUE.E01[0]!)
     expect(exercice.exercice.typeTravaille).toBe('E01')
     expect(exercice.exercice.tentative).toBe(0)

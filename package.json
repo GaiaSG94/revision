@@ -1,15 +1,16 @@
 {
-  "name": "rature",
+  "name": "revision",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Raturé — photographie ta copie corrigée : elle trouve l'erreur que tu répètes et fabrique l'exercice exactement dessus.",
+  "description": "Revision — photograph your corrected paper: it finds the mistake you repeat and builds the exercise right on it.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
+    "test:live": "vitest run --config vitest.live.config.ts",
     "test:watch": "vitest",
     "lint:tokens": "node scripts/check-tokens.mjs"
   },

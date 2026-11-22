@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
-"""Agent de conflit Fireworks pour la file pr-auto-merge.
+"""Fireworks conflict agent for the pr-auto-merge queue.
 
-Appelé par le sweep DANS son clone quand un rebase bute sur un conflit : il
-fait résoudre chaque conflit élémentaire par un modèle Fireworks, recopie le
-reste du fichier intact (jamais de réécriture complète : un gros fichier serait
-tronqué), boucle sur les arrêts (commits vidés sautés), pousse et rend compte.
-`union_journal.py` réunit les journaux sans modèle ; `quota.py` borne les
-saisines (cooldown, plafond horaire, 3 par PR en 30 min).
+Called by the sweep INSIDE its clone when a rebase hits a conflict: it has
+Fireworks resolve each elementary conflict, copies the rest of the file
+unchanged (never a full rewrite: a large file would be truncated), loops over
+stops (emptied commits skipped), pushes and reports. `union_journal.py` unites
+logs without a model; `quota.py` bounds invocations (cooldown, hourly cap,
+3 per PR in 30 min).
 
-Porte de compilation (v3, 31/10) : une résolution qui ne compile pas n'est
-**jamais poussée** (`compilation_gate.py`). Motif : #615, réconciliation cassée
-classée « échec réel » puis abandonnée. Coupe-circuit : `CONFLICT_COMPILE_GATE=0`.
-Usage : `resolve --repo O/R --pr N --branch b --sha s` (`--dry-run` : prompt
-seul). Codes : 0 poussé, 1 échec commenté, 2 rien à faire. Aucun secret dedans.
+Compilation gate (v3, 31/10): a resolution that does not compile is
+**never pushed** (`compilation_gate.py`). Reason: #615, broken reconciliation
+classified as 'real failure' then abandoned. Circuit breaker:
+`CONFLICT_COMPILE_GATE=0`. Usage: `resolve --repo O/R --pr N --branch b --sha s`
+(`--dry-run`: prompt only). Codes: 0 pushed, 1 commented failure, 2 nothing
+to do. No secret inside.
 """
 
 import argparse
@@ -27,7 +28,7 @@ import urllib.request
 
 
 def _charger(nom):
-    """Module voisin : import direct, sinon `origin/main` (branche antérieure)."""
+    """Neighbouring module: direct import, otherwise `origin/main` (earlier branch)."""
     try:
         return __import__(nom)
     except ImportError:
@@ -47,7 +48,7 @@ def _charger(nom):
 
 union_journal = _charger("union_journal")
 quota = _charger("quota")
-# v3 : porte de compilation à côté (`compilation_gate.py`) : plafond de 500 lignes.
+# v3: compilation gate alongside (`compilation_gate.py`): 500-line cap.
 compilation_gate = _charger("compilation_gate")
 
 MODEL_DEFAULT = "accounts/fireworks/models/minimax-m3p1-flash"
@@ -60,19 +61,19 @@ MAX_ROUNDS = 10
 BUDGET_S = 240
 CALL_TIMEOUT_S = 90
 MAX_TOKENS = 8_000
-TEMPERATURE = 0.2
+TEMPEREVISION = 0.2
 LABEL_OK = "agent-conflit"
 LABEL_HUMAN = "intervention-humaine"
-COMMENT_PREFIX = "_fireworks · agent de conflit (MiniMax M3.1 Flash)_"
+COMMENT_PREFIX = "_fireworks · conflict agent (MiniMax M3.1 Flash)_"
 REFUSED_PREFIXES = (".github/", ".mergify.yml")
 
 
 class AgentError(Exception):
-    """Échec avec message publiable (sans secret)."""
+    """Failure with a publishable message (no secret)."""
 
 
 def sh(args, **kw):
-    """Exécute une commande, rend sa sortie texte dépouillée."""
+    """Runs a command and returns its stripped text output."""
     proc = subprocess.run(args, capture_output=True, text=True, **kw)
     if proc.returncode != 0:
         raise AgentError("%s : %s" % (" ".join(args[:3]),
@@ -85,7 +86,7 @@ def log(message):
 
 
 def pr_labels(repo, pr):
-    """Noms des labels de la PR (liste vide si illisible)."""
+    """Names of the PR labels (empty list if unreadable)."""
     try:
         out = sh(["gh", "pr", "view", str(pr), "--repo", repo,
                   "--json", "labels", "-q", ".labels[].name"])
@@ -95,25 +96,25 @@ def pr_labels(repo, pr):
 
 
 def comment(repo, pr, body):
-    """Commente la PR ; best-effort, ne lève jamais."""
+    """Comments on the PR; best-effort, never throws."""
     try:
         proc = subprocess.run(["gh", "pr", "comment", str(pr), "--repo", repo,
                                "--body", COMMENT_PREFIX + "\n\n" + body],
                               capture_output=True, text=True, timeout=60)
         if proc.returncode != 0:
-            log("commentaire refusé : %s" % proc.stderr.strip()[:150])
+            log("comment refused: %s" % proc.stderr.strip()[:150])
     except Exception as exc:                                   # noqa: BLE001
-        log("commentaire impossible : %s" % exc)
+        log("comment impossible: %s" % exc)
 
 
 def add_label(repo, pr, label):
-    """Pose un label ; best-effort, ne lève jamais."""
+    """Sets a label; best-effort, never throws."""
     try:
         subprocess.run(["gh", "pr", "edit", str(pr), "--repo", repo,
                         "--add-label", label],
                        capture_output=True, text=True, timeout=60)
     except Exception as exc:                                   # noqa: BLE001
-        log("label %s impossible : %s" % (label, exc))
+        log("label %s impossible: %s" % (label, exc))
 
 
 def abort_rebase():
@@ -130,10 +131,10 @@ def unmerged_files():
 
 
 def split_hunks(text):
-    """Découpe un fichier marqué : ("clean", txt) / ("hunk", dict).
+    """Cuts a marked file into: ("clean", txt) / ("hunk", dict).
 
-    Gère diff et diff3 (avec ou sans base). En rebase, le premier bloc
-    ("head") est main (destination) et le second ("saved") la branche.
+    Handles diff and diff3 (with or without base). During a rebase, the first
+    block ("head") is main (destination) and the second ("saved") the branch.
     """
     segments, buf = [], []
     lines = text.split("\n")
@@ -171,27 +172,27 @@ def split_hunks(text):
 
 
 def build_hunk_messages(path, hunk):
-    """Prompt de résolution pour UN conflit élémentaire (rebase)."""
-    system = ("Tu résous UN conflit de fusion git (un seul morceau de "
-              "fichier). Tu rends UNIQUEMENT le texte résolu de ce morceau, "
-              "sans aucun marqueur, en gardant les deux intentions (jamais "
-              "un bord choisi à l'aveugle). Tu ne réponds que par le texte, "
-              "dans un seul bloc de code.")
-    parts = ["Fichier : %s (extrait)" % path,
-             "--- Version de la branche (à garder en priorité en cas de doute) ---",
+    """Resolution prompt for ONE elementary conflict (rebase)."""
+    system = ("You resolve ONE git merge conflict (a single part of "
+              "a file). Return ONLY the resolved text of that part, "
+              "with no markers, keeping both intentions (never "
+              "a side chosen blindly). Answer with the text only, "
+              "in a single code block.")
+    parts = ["File: %s (excerpt)" % path,
+             "--- Branch version (keep it first in case of doubt) ---",
              "\n".join(hunk["saved"])]
     if hunk["base"] is not None:
-        parts += ["--- Version ancêtre commun ---", "\n".join(hunk["base"])]
-    parts += ["--- Version de main ---", "\n".join(hunk["head"]),
-              "Rends le morceau résolu, dans un seul bloc de code."]
+        parts += ["--- Common ancestor version ---", "\n".join(hunk["base"])]
+    parts += ["--- Main version ---", "\n".join(hunk["head"]),
+              "Return the resolved part, in a single code block."]
     return [{"role": "system", "content": system},
             {"role": "user", "content": "\n".join(parts)}]
 
 
 def fw_complete(api_url, key, model, messages):
-    """Un appel chat/completions Fireworks, rend le texte réponse."""
+    """One Fireworks chat/completions call, returns the response text."""
     payload = json.dumps({"model": model, "messages": messages,
-                          "temperature": TEMPERATURE,
+                          "temperevision": TEMPEREVISION,
                           "max_tokens": MAX_TOKENS}).encode("utf-8")
     req = urllib.request.Request(api_url, data=payload, method="POST")
     req.add_header("Authorization", "Bearer " + key)
@@ -200,15 +201,15 @@ def fw_complete(api_url, key, model, messages):
         with urllib.request.urlopen(req, timeout=CALL_TIMEOUT_S) as resp:
             data = json.loads(resp.read().decode("utf-8"))
     except Exception as exc:                                   # noqa: BLE001
-        raise AgentError("appel Fireworks : %s" % str(exc)[:200])
+        raise AgentError("Fireworks call: %s" % str(exc)[:200])
     try:
         return data["choices"][0]["message"]["content"]
     except (KeyError, IndexError, TypeError):
-        raise AgentError("réponse Fireworks illisible (pas de choices[0])")
+        raise AgentError("unreadable Fireworks response (no choices[0])")
 
 
 def extract_file(text):
-    """Extrait le fichier résolu : bloc de code, sinon texte brut."""
+    """Extracts the resolved file: code block, otherwise raw text."""
     cleaned = re.sub(r"<think>.*?</think>", "", text, flags=re.S)
     match = re.search(r"```[^\n]*\n(.*?)```", cleaned, flags=re.S)
     body = match.group(1) if match else cleaned
@@ -216,7 +217,7 @@ def extract_file(text):
 
 
 def still_marked(content):
-    """Vrai s'il reste des marqueurs de conflit git."""
+    """True if git conflict markers remain."""
     for line in content.splitlines():
         if line.startswith("<<<<<<< ") or line == "<<<<<<<":
             return True
@@ -228,25 +229,25 @@ def still_marked(content):
 
 
 def resolve_one(api_url, key, model, path, deadline, dry_run):
-    """Résout un fichier conflit par conflit, le reste recopié intact."""
+    """Resolves a file conflict by conflict, copying the rest unchanged."""
     if time.time() > deadline:
-        raise AgentError("budget de %d s dépassé" % BUDGET_S)
+        raise AgentError("budget of %d s exceeded" % BUDGET_S)
     try:
         size = os.path.getsize(path)
     except OSError:
-        raise AgentError("fichier illisible : %s" % path)
+        raise AgentError("unreadable file: %s" % path)
     if size > MAX_FILE_BYTES:
-        raise AgentError("fichier trop gros : %s (%d o)" % (path, size))
+        raise AgentError("file too large: %s (%d bytes)" % (path, size))
     with open(path, encoding="utf-8", errors="replace") as fh:
         text = fh.read()
     if "\x00" in text[:8_000]:
-        raise AgentError("binaire : %s" % path)
+        raise AgentError("binary: %s" % path)
     segments = split_hunks(text)
     hunks = [seg for kind, seg in segments if kind == "hunk"]
     if not hunks:
-        raise AgentError("conflit sans marqueurs (suppression ?) : %s" % path)
+        raise AgentError("conflict without markers (deletion?): %s" % path)
     if len(hunks) > MAX_HUNKS:
-        raise AgentError("%d conflits élémentaires (plafond %d) : %s"
+        raise AgentError("%d elementary conflicts (cap %d): %s"
                          % (len(hunks), MAX_HUNKS, path))
     if dry_run:
         for seg in hunks:
@@ -254,23 +255,23 @@ def resolve_one(api_url, key, model, path, deadline, dry_run):
             print("===== %s =====" % path)
             print(messages[1]["content"][:4_000])
         return
-    log("résolution de %s (%d conflits)" % (path, len(hunks)))
+    log("resolving %s (%d conflicts)" % (path, len(hunks)))
     out = []
     for kind, seg in segments:
         if kind == "clean":
             out.append(seg)
             continue
         if time.time() > deadline:
-            raise AgentError("budget de %d s dépassé" % BUDGET_S)
+            raise AgentError("budget of %d s exceeded" % BUDGET_S)
         total = sum(len("\n".join(seg[k])) for k in ("head", "saved"))
         if seg["base"] is not None:
             total += len("\n".join(seg["base"]))
         if total > HUNK_MAX_CHARS:
-            raise AgentError("conflit élémentaire trop gros : %s" % path)
+            raise AgentError("elementary conflict too large: %s" % path)
         messages = build_hunk_messages(path, seg)
         resolved = extract_file(fw_complete(api_url, key, model, messages))
         if still_marked(resolved):
-            raise AgentError("le modèle a rendu des marqueurs : %s" % path)
+            raise AgentError("the model returned markers: %s" % path)
         out.append(resolved.rstrip("\n"))
     with open(path, "w", encoding="utf-8") as fh:
         fh.write("\n".join(out))
@@ -278,47 +279,47 @@ def resolve_one(api_url, key, model, path, deadline, dry_run):
 
 
 def fail(repo, pr, reason):
-    """Compte rendu d'échec : rebase annulé, commentaire + label humain."""
+    """Failure report: rebase aborted, comment + human label."""
     abort_rebase()
-    comment(repo, pr, "Conflit **non résolu** : %s\n\nÀ l'auteur de rebaser." % reason)
+    comment(repo, pr, "Conflict **unresolved**: %s\n\nAuthor must rebase." % reason)
     add_label(repo, pr, LABEL_HUMAN)
-    log("échec : %s" % reason)
+    log("failure: %s" % reason)
     return 1
 
 
 class _SaisineLocale(Exception):
-    """Repli si `quota.py` n'est pas joignable (déploiement ancien)."""
+    """Fallback if `quota.py` is unreachable (older deployment)."""
 
 
 Skip = quota.Saisine if quota else _SaisineLocale
 
 
 def env_or(name, default):
-    """Variable d'env ou défaut. GitHub injecte une var absente comme ""
-    (et non unset) : `os.environ.get(n, d)` rendrait "" → 400 Fireworks."""
+    """Env var or default. GitHub injects an absent var as ""
+    (not unset): `os.environ.get(n, d)` would return "" → 400 Fireworks."""
     return os.environ.get(name) or default
 
 
 def preflight(repo, pr, sha, dry_run, now):
-    """Garde-fous et lecture des fichiers en conflit. Rend (clé, modèle, url, fichiers)."""
+    """Safeguards and reading of conflicting files. Returns (key, model, url, files)."""
     if os.environ.get("FIREWORKS_AGENT_RESOLVE", "1") == "0":
-        raise Skip("désactivé (FIREWORKS_AGENT_RESOLVE=0)")
+        raise Skip("disabled (FIREWORKS_AGENT_RESOLVE=0)")
     key = os.environ.get("FIREWORKS_API_KEY", "")
     if not key and not dry_run:
-        raise Skip("pas de clé FIREWORKS_API_KEY")
+        raise Skip("no FIREWORKS_API_KEY key")
     if quota is not None:
         quota.gc_stamps(now)
     labels = pr_labels(repo, pr)
     if "hold" in labels or LABEL_HUMAN in labels:
-        raise Skip("labels %s : main humaine" % ",".join(labels))
-    # Cooldown et plafonds à l'instant de la saisine : un conflit d'ajouts purs
-    # se règle sans modèle, même plafond épuisé.
+        raise Skip("labels %s: human hand" % ",".join(labels))
+    # Cooldown and caps at invocation time: a pure-addition conflict
+    # resolves without a model, even when the cap is exhausted.
     try:
         files = unmerged_files()
     except AgentError as exc:
-        raise Skip("git illisible : %s" % exc)
+        raise Skip("unreadable git: %s" % exc)
     if not files:
-        raise Skip("aucun fichier en conflit")
+        raise Skip("no conflicting file")
     check_round_files(files)
     model = env_or("FIREWORKS_MODEL", MODEL_DEFAULT)
     api_url = env_or("FIREWORKS_BASE_URL", API_DEFAULT)
@@ -326,7 +327,7 @@ def preflight(repo, pr, sha, dry_run, now):
 
 
 def push_url(repo):
-    """URL push authentifiée (GH_TOKEN) ; "origin" en repli local."""
+    """Authenticated push URL (GH_TOKEN); "origin" as local fallback."""
     token = os.environ.get("GH_TOKEN", "")
     if not token:
         return "origin"
@@ -334,7 +335,7 @@ def push_url(repo):
 
 
 def rebase_in_progress():
-    """Vrai si un rebase est en cours (répertoire d'état présent)."""
+    """True if a rebase is in progress (state directory present)."""
     try:
         gitdir = sh(["git", "rev-parse", "--absolute-git-dir"])
     except AgentError:
@@ -344,7 +345,7 @@ def rebase_in_progress():
 
 
 def continue_or_skip(env):
-    """Un pas de rebase : --continue, --skip si commit vidé. Rend (ok, erreur)."""
+    """One rebase step: --continue, --skip if commit emptied. Returns (ok, error)."""
     cont = subprocess.run(["git", "rebase", "--continue"], env=env,
                           capture_output=True, text=True, timeout=120)
     if cont.returncode == 0:
@@ -359,44 +360,44 @@ def continue_or_skip(env):
             skip = subprocess.run(["git", "rebase", "--skip"], env=env,
                                   capture_output=True, text=True, timeout=120)
             if skip.returncode == 0:
-                log("commit vidé par la résolution, --skip")
+                log("commit emptied by resolution, --skip")
                 return True, ""
     return False, err
 
 
 def check_round_files(files):
-    """Garde-fous d'une passe : chemins refusés et plafond de fichiers."""
+    """Safeguards for one round: refused paths and file cap."""
     refused = [p for p in files if p.startswith(REFUSED_PREFIXES)]
     if refused:
-        raise AgentError("conflit dans %s (main humaine requise)"
+        raise AgentError("conflict in %s (human hand required)"
                          % ", ".join(refused))
     if len(files) > MAX_FILES:
-        raise AgentError("%d fichiers en conflit (plafond %d)"
+        raise AgentError("%d conflicting files (cap %d)"
                          % (len(files), MAX_FILES))
 
 
 def autorisation_saisine(pr, sha):
-    """Cooldown et plafonds, à l'instant d'appeler le modèle (quota.py).
+    """Cooldown and caps, at the moment of calling the model (quota.py).
 
-    Séparé de `preflight` pour que l'union déterministe des journaux
-    (gratuite) ne soit jamais bloquée par un plafond d'appels.
+    Separate from `preflight` so that the deterministic union of logs
+    (free) is never blocked by a call cap.
     """
     if quota is not None:
         quota.autoriser(pr, sha)
 
 
 def finish_loop(api_url, key, model, deadline, autorisation=None):
-    """Boucle multi-passes : résout chaque arrêt, continue/skip. Rend fichiers."""
+    """Multi-round loop: resolve each stop, continue/skip. Returns files."""
     resolved = []
     env = dict(os.environ, GIT_EDITOR="true")
     autorise = autorisation is None
     for round_no in range(1, MAX_ROUNDS + 1):
         if time.time() > deadline:
-            raise AgentError("budget de %d s dépassé" % BUDGET_S)
+            raise AgentError("budget of %d s exceeded" % BUDGET_S)
         files = unmerged_files()
         if files:
             check_round_files(files)
-            log("passe %d : %d fichier(s)" % (round_no, len(files)))
+            log("round %d: %d file(s)" % (round_no, len(files)))
             faits = (union_journal.resoudre_par_union(files)
                      if union_journal else [])
             reste = [path for path in files if path not in faits]
@@ -411,40 +412,40 @@ def finish_loop(api_url, key, model, deadline, autorisation=None):
         if not rebase_in_progress():
             if done:
                 return resolved
-            raise AgentError("rebase interrompu : %s" % err)
+            raise AgentError("rebase interrupted: %s" % err)
         if not unmerged_files():
-            raise AgentError("rebase bloqué sans conflit : %s" % err)
-    raise AgentError("rebase à plus de %d arrêts, main humaine" % MAX_ROUNDS)
+            raise AgentError("rebase stuck without conflict: %s" % err)
+    raise AgentError("rebase with more than %d stops, human hand" % MAX_ROUNDS)
 
 
 def porte_compilation(files, branch):
-    """(ok, message, corps) ; neutre si le module voisin n'est pas joignable."""
+    """(ok, message, body); neutral if the neighbouring module is unreachable."""
     if compilation_gate is None:
-        return True, "", "Conflit réconcilié, rebase poussé sur `%s`." % branch
+        return True, "", "Conflict reconciled, rebase pushed to `%s`." % branch
     return compilation_gate.prepare_push(files, branch)
 
 
 def finish(repo, pr, branch, sha, files):
-    """Pousse le rebase terminé avec bail, rend compte. Rend 0 ou 1."""
+    """Pushes the finished rebase with a lease, reports. Returns 0 or 1."""
     ok, message, corps = porte_compilation(files, branch)
     if not ok:
-        # Rien n'est poussé : branche intacte, PR DIRTY (retour au tour suivant).
-        comment(repo, pr, "Résolution **non compilable** : rien n'est poussé, "
-                "la branche reste intacte.\n\n%s" % message)
+        # Nothing is pushed: branch intact, PR DIRTY (back to the next round).
+        comment(repo, pr, "**Non-compilable** resolution: nothing is pushed, "
+                "the branch stays intact.\n\n%s" % message)
         add_label(repo, pr, LABEL_HUMAN)
-        log("porte de compilation rouge : rien n'est poussé")
+        log("compilation gate red: nothing is pushed")
         return 1
     push = subprocess.run(["git", "push",
                            "--force-with-lease=%s:%s" % (branch, sha),
                            push_url(repo), "HEAD:%s" % branch],
                           capture_output=True, text=True, timeout=120)
     if push.returncode != 0:
-        log("push refusé (bail, prochain passage) : %s"
+        log("push refused (lease, next pass): %s"
             % push.stderr.strip()[:150])
         return 1
-    comment(repo, pr, corps)   # corps porte le marqueur de tête (blayeur)
+    comment(repo, pr, corps)   # body carries the head marker (sweeper)
     add_label(repo, pr, LABEL_OK)
-    log("PR #%s rebasée et poussée (%d fichiers)" % (pr, len(set(files))))
+    log("PR #%s rebased and pushed (%d files)" % (pr, len(set(files))))
     return 0
 
 
@@ -467,13 +468,13 @@ def cmd_resolve(args):
         except AgentError as exc:
             return fail(repo, pr, str(exc))
         return 0
-    # Le dry-run ne touche jamais l'empreinte (ni cooldown ni plafond horaire).
+    # Dry-run never touches the fingerprint (no cooldown or hourly cap).
     try:
         resolved = finish_loop(api_url, key, model, deadline,
                                lambda: autorisation_saisine(pr, args.sha))
     except Skip as exc:
-        # Union faite, saisine refusée : rien n'est poussé, l'appelant abandonne
-        # le rebase et la PR repart au prochain tour.
+        # Union done, invocation refused: nothing is pushed, the caller abandons
+        # the rebase and the PR goes to the next round.
         log(str(exc))
         return 2
     except AgentError as exc:
@@ -491,7 +492,7 @@ def main(argv=None):
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args(argv)
     if args.cmd == "resolve" and not args.dry_run and not (args.branch and args.sha):
-        ap.error("--branch et --sha sont requis hors --dry-run")
+        ap.error("--branch and --sha are required outside --dry-run")
     return cmd_resolve(args)
 
 

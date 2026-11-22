@@ -17,14 +17,14 @@ import { PROMPT_REVUE } from '../src/pipeline/revue'
 import { parserAnalyse, parserExercice, parserVerdict } from '../src/pipeline/schemas'
 
 /**
- * Le mode démo rejoue de vraies réponses de modèle. Ces tests vérifient que
- * chaque enregistrement est toujours exploitable **sur le chemin courant du
- * produit** : une évolution du pipeline (fusion d'appels, seconde passe) casse
- * la démo en silence si on ne recapture pas — c'est arrivé le 11/11, tout
- * retombait en E99. Le test échoue désormais dans ce cas.
+ * Demo mode replays real model responses. These tests check that every recording
+ * is still usable **on the product's current path**: a pipeline change (merged
+ * calls, second pass) silently breaks the demo if we do not recapture — this
+ * happened on 11/11, everything fell back to E99. The test now fails in that
+ * case.
  */
-describe('mode démonstration', () => {
-  it('reconnaît l’étape à partir du prompt', () => {
+describe('demo mode', () => {
+  it('recognizes the step from the prompt', () => {
     const requete = (system: string) => ({ system, user: 'x' })
     expect(etapeDe(requete(PROMPT_ANALYSE))).toBe('analyse')
     expect(etapeDe(requete(PROMPT_REVUE))).toBe('revue')
@@ -32,7 +32,7 @@ describe('mode démonstration', () => {
     expect(etapeDe(requete(PROMPT_GARDE_FOU))).toBe('verdict')
   })
 
-  it('au moins une copie est enregistrée, avec un identifiant stable', () => {
+  it('at least one paper is recorded, with a stable identifier', () => {
     expect(COPIES_DEMO.length).toBeGreaterThanOrEqual(1)
     expect(ID_COPIES_DEMO).toHaveLength(COPIES_DEMO.length)
     expect(copieDemo(ID_COPIES_DEMO[0])?.id).toBe(ID_COPIES_DEMO[0])
@@ -40,7 +40,7 @@ describe('mode démonstration', () => {
     expect(copieDemo()).toBeDefined()
   })
 
-  it.each(ID_COPIES_DEMO)('la copie %s se rejoue en un diagnostic typé', async (id) => {
+  it.each(ID_COPIES_DEMO)('paper %s replays as a typed diagnosis', async (id) => {
     const client = clientDemoPour(id, { attente: false })
     const meta = origineDemo(id)
     expect(meta).not.toBeNull()
@@ -48,9 +48,9 @@ describe('mode démonstration', () => {
     const brut = parserAnalyse(await client({ system: PROMPT_ANALYSE, user: 'x' }))
     const { extraction, erreurs } = decouperAnalyse(brut)
 
-    // Une copie « propre » enregistrée : le diagnostic attendu est l'absence
-    // de faute (RNF-04), et le pipeline s'arrête avant classification et
-    // exercice — il n'y a rien à rejouer ensuite.
+    // A recorded "clean" paper: the expected diagnosis is no error (RNF-04),
+    // and the pipeline stops before classification and exercise — there is
+    // nothing left to replay.
     if (meta!.dominant === 'propre') {
       expect(extraction.copiePropre).toBe(true)
       expect(erreurs).toHaveLength(0)
@@ -61,8 +61,8 @@ describe('mode démonstration', () => {
     expect(erreurs.length).toBeGreaterThanOrEqual(1)
 
     const diagnostic = construireDiagnostic(erreurs, { id, createdAt: '2026-11-12T12:00:00.000Z' })
-    // Garde anti-E99 : si tout retombe en « non typée », l'enregistrement est périmé.
-    expect(diagnostic.erreurs.some((e) => e.code !== 'E99'), 'toutes les fautes en E99').toBe(true)
+    // Anti-E99 guard: if everything falls back to "untyped", the recording is obsolete.
+    expect(diagnostic.erreurs.some((e) => e.code !== 'E99'), 'all errors in E99').toBe(true)
     expect(diagnostic.typeDominant).toBe(meta!.dominant)
     if (meta!.nbFautes !== null) expect(diagnostic.nbFautes).toBe(meta!.nbFautes)
 
@@ -72,29 +72,29 @@ describe('mode démonstration', () => {
 
     const verdict = parserVerdict(await client({ system: PROMPT_GARDE_FOU, user: 'x' }))
     if (!verdictAccepte(verdict)) {
-      // Refus assumé : deux tentatives épuisées, le produit ne sert pas un
-      // exercice hors sujet et le dit (« exercice non disponible »). Un refus
-      // muet, lui, serait un bug — il doit toujours être motivé.
+      // Accepted refusal: two attempts exhausted, the product does not serve
+      // an off-topic exercise and says so ("exercise unavailable"). A silent
+      // refusal would be a bug — it must always be justified.
       expect(verdict.motifs.length).toBeGreaterThan(0)
     }
   })
 
-  it('un enregistrement sans réponse de seconde passe lève un message explicite', async () => {
+  it('a recording with no second-pass answer raises an explicit message', async () => {
     const copie = COPIES_DEMO.find((c) => !c.enregistrement.reponses.revue)
-    if (!copie) return // toutes les copies ont une revue enregistrée : rien à tester
+    if (!copie) return // all papers have a recorded review: nothing to test
     const client = clientDemoPour(copie.id, { attente: false })
     await expect(client({ system: PROMPT_REVUE, user: 'x' })).rejects.toThrow(/recapture/)
   })
 })
 
 /**
- * Corpus de démo v2 (copies du 15/11) : quatre copies du même élève en
- * terminale — la faute de signe qui revient, puis disparaît. Les expectations
- * ci-dessous sont **mesurées** (docs/VALIDATION-MODELE.md) : si une récapture
- * change un résultat, ce test échoue et la documentation doit être mise à jour
- * dans le même commit — pas l'inverse.
+ * Demo corpus v2 (papers from 15/11): four papers from the same Grade 12
+ * student — the sign mistake comes back, then disappears. The expectations
+ * below are **measured** (docs/VALIDATION-MODELE.md): if a recapture changes a
+ * result, this test fails and the documentation must be updated in the same
+ * commit — not the other way around.
  */
-describe('corpus de démo v2 — Jordan, Grade 12', () => {
+describe('demo corpus v2 — Jordan, Grade 12', () => {
   const ATTENDU: Record<string, string> = {
     'v2-copie-1': 'E01',
     'v2-copie-2': 'E01',
@@ -102,7 +102,7 @@ describe('corpus de démo v2 — Jordan, Grade 12', () => {
     'v2-copie-4': 'propre',
   }
 
-  it('les quatre cartes portent les titres annoncés', () => {
+  it('the four cards carry the announced titles', () => {
     const titres = Object.keys(ATTENDU).map((id) => titreCarte(echantillonDe(id)!))
     expect(titres).toEqual([
       'Jordan · Test 3 — Algebra & derivatives',
@@ -112,13 +112,13 @@ describe('corpus de démo v2 — Jordan, Grade 12', () => {
     ])
   })
 
-  it.each(Object.entries(ATTENDU))('%s est enregistrée avec le type attendu', (id, dominant) => {
+  it.each(Object.entries(ATTENDU))('%s is recorded with the expected type', (id, dominant) => {
     const copie = copieDemo(id)
-    expect(copie, `${id} absente du corpus de démo`).toBeDefined()
+    expect(copie, `${id} missing from the demo corpus`).toBeDefined()
     expect(copie!.enregistrement.dominant).toBe(dominant)
   })
 
-  it('la copie 1 détecte aussi E03, la copie propre aucun code', () => {
+  it('paper 1 also detects E03, the clean paper no code', () => {
     const analyse = JSON.parse(copieDemo('v2-copie-1')!.enregistrement.reponses.analyse!) as {
       annotations: { code: string }[]
       copiePropre: boolean
@@ -134,7 +134,7 @@ describe('corpus de démo v2 — Jordan, Grade 12', () => {
     expect(propre.annotations).toHaveLength(0)
   })
 
-  it('le tour guidé suit les quatre copies de Jordan', () => {
+  it('the guided tour follows Jordan’s four papers', () => {
     expect(TOUR_DEMO).toEqual(['v2-copie-1', 'v2-copie-2', 'v2-copie-3', 'v2-copie-4'])
   })
 })

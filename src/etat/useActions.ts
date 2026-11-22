@@ -1,7 +1,7 @@
 /**
- * Actions de l'application. Toute analyse passe par `executerAnalyse` : le mode
- * démo n'est qu'un client différent (`clientDemoPour`), jamais un chemin
- * parallèle — c'est ce qui garantit que la démo montre le vrai pipeline.
+ * Application actions. Every analysis goes through `executerAnalyse`: demo mode
+ * is just a different client (`clientDemoPour`), never a parallel path — that
+ * is what guarantees the demo shows the real pipeline.
  */
 import type { Dispatch, SetStateAction } from 'react'
 import { useCallback } from 'react'
@@ -12,20 +12,20 @@ import { obtenirExercice } from '../pipeline/exercise'
 import { analyserCopie } from '../pipeline/orchestrate'
 import type { Transport } from '../pipeline/llm'
 import { enregistrerDiagnostic, effacerHistorique, sauverReglages } from '../storage/local'
-import type { Etat, Modificateur } from './useEtatRature'
-import type { Ecran } from './useEtatRature'
-import { amontMort, fusionner, messageErreur, transportDe } from './useEtatRature'
+import type { Etat, Modificateur } from './useEtatRevision'
+import type { Ecran } from './useEtatRevision'
+import { amontMort, fusionner, messageErreur, transportDe } from './useEtatRevision'
 import type { Reglages } from '../domain/types'
 
 const ATTENTE_DEMO_GUIDEE_MS = 850
-/** Délai max d'une analyse avant de rendre la main avec un message honnête. */
+/** Maximum wait for an analysis before giving up with an honest message. */
 const DELAI_ANALYSE_MAX_MS = 150_000
 
 export type { Reglages }
 
 type Ctx = { etat: Etat; setEtat: Dispatch<SetStateAction<Etat>>; aller: (ecran: Ecran) => void }
 
-/** Transport commun à tous les appels : chaîne optimisée + modèle répondu. */
+/** Transport shared by all calls: optimized chain + model that answered. */
 function transportPour({ etat, setEtat }: Ctx) {
   return transportDe(etat.reglages, {
     chaine: etat.chaineModeles,
@@ -34,7 +34,7 @@ function transportPour({ etat, setEtat }: Ctx) {
   })
 }
 
-/** Une analyse, avec publication de la progression. Rend null si échec. */
+/** One analysis, with progress reporting. Returns null on failure. */
 async function executerAnalyse(
   fichier: File,
   options: { transport: Transport; demoId?: string; attenteMax?: number; setEtat: Ctx['setEtat'] },
@@ -56,11 +56,10 @@ async function executerAnalyse(
   }
 }
 
-/** Affiche le diagnostic dès la fin de l'étape 5, puis persiste en arrière-plan. */
 /**
- * Affiche le diagnostic dès la fin de l'étape 5 — sauf si l'utilisateur a
- * quitté l'écran Analyse (mode asynchrone, idée 8) : dans ce cas on ne le
- * rapatrie pas de force, on allume un badge « diagnostic prêt ».
+ * Displays the diagnosis as soon as step 5 ends, then persists in the
+ * background. Exception: if the user left the Analysis screen (async mode,
+ * idea 8), we do not force a return — we light up a "diagnosis ready" badge.
  */
 function publierPartiel(
   setEtat: Ctx['setEtat'],
@@ -97,9 +96,9 @@ export function useActionsRature({ etat, setEtat, aller }: Ctx) {
         dernierFichier: fichier,
       }))
       const demoId = options.demoId ?? null
-      // Délai max, honnête : au-delà, on rend la main avec un message clair au
-      // lieu de laisser l'écran bloqué sur une étape « en cours » pendant
-      // plusieurs minutes (bug du 15/11 devant un juge).
+      // Honest timeout: beyond it, we give control back with a clear message
+      // instead of leaving the screen stuck on an "in progress" step for
+      // several minutes (bug of 15/11 in front of a judge).
       let vidange: ReturnType<typeof setTimeout> | undefined
       const delaiMax = new Promise<null>((resoudre) => {
         vidange = setTimeout(() => resoudre(null), DELAI_ANALYSE_MAX_MS)
@@ -124,9 +123,9 @@ export function useActionsRature({ etat, setEtat, aller }: Ctx) {
         setEtat((precedent) => ({ ...precedent, occupe: false, resultat, demoId }))
         return
       }
-      // Le watchdog a gagné (la course n'a rien renvoyé ni échoué) : on rend
-      // la main. L'analyse continue en arrière-plan : si elle aboutit, le
-      // badge « diagnosis ready » s'allumera quand même (idée 8).
+      // The watchdog won (the race returned nothing and did not fail): we give
+      // control back. The analysis keeps running in the background: if it
+      // succeeds, the "diagnosis ready" badge will still light up (idea 8).
       setEtat((precedent) => ({
         ...precedent,
         occupe: false,
@@ -136,7 +135,7 @@ export function useActionsRature({ etat, setEtat, aller }: Ctx) {
     [aller, etat.reglages, setEtat],
   )
 
-  /** Démo : une copie seule (rythme réel), ou plusieurs d'affilée (tour guidé : trajectoire du profil, rythme accéléré). */
+  /** Demo: one paper (real pace), or several in a row (guided tour: profile trajectory, faster pace). */
   const analyserDemo = useCallback(
     async (ids?: string[]) => {
       const cibles = ids && ids.length > 0 ? ids : ID_COPIES_DEMO.slice(0, 1)
@@ -147,16 +146,16 @@ export function useActionsRature({ etat, setEtat, aller }: Ctx) {
           ...(guide ? { attenteMax: ATTENTE_DEMO_GUIDEE_MS } : {}),
         })
       }
-      // Plusieurs copies : c'est la trajectoire qui intéresse, pas la dernière copie.
+      // Several papers: what matters is the trajectory, not the last paper.
       if (guide) aller('profil')
     },
     [analyser, aller],
   )
 
   /**
-   * Un échantillon joué par le jury : une photo de copie réelle. Si les
-   * réponses du modèle sont enregistrées sur CETTE photo, on rejoue hors
-   * ligne ; sinon l'analyse part en ligne vers le proxy edge.
+   * A sample played by the user: a real paper photo. If the model responses are
+   * recorded for THAT photo, we replay offline; otherwise the analysis goes
+   * online to the edge proxy.
    */
   const analyserEchantillon = useCallback(
     async (id: string) => {
@@ -172,9 +171,8 @@ export function useActionsRature({ etat, setEtat, aller }: Ctx) {
   )
 
   /**
-   * Mode prof : les copies analysées ici ne rejoignent PAS l'historique
-   * personnel — le profil d'un élève et la statistique d'une classe ne se
-   * mélangent pas.
+   * Teacher mode: papers analysed here do NOT join the personal history — a
+   * student's profile and a class statistic must not be mixed.
    */
   const analyserLot = useCallback(
     async (fichiers: File[], demoIds?: string[]) => {
@@ -194,7 +192,7 @@ export function useActionsRature({ etat, setEtat, aller }: Ctx) {
     [etat.reglages, setEtat],
   )
 
-  /** Mode prof hors ligne : le lot de démonstration, réponses enregistrées. */
+  /** Offline teacher mode: the demo batch, with recorded responses. */
   const analyserLotDemo = useCallback(async () => {
     const fichiers: File[] = []
     for (const id of ID_COPIES_DEMO) fichiers.push(await fichierDemoPour(id))
@@ -224,9 +222,9 @@ export function useActionsRature({ etat, setEtat, aller }: Ctx) {
   }, [setEtat])
 
   /**
-   * Un autre exercice. Par défaut : **banque locale**, donc aucun appel réseau
-   * (idée 1). `inedit: true` demande au modèle un exercice inédit — deux
-   * appels, donc 30 à 110 s sur l'amont : c'est un choix, pas un défaut.
+   * Another exercise. By default: **local bank**, so no network call (idea 1).
+   * `inedit: true` asks the model for a fresh exercise — two calls, so 30 to
+   * 110 s on the upstream: it is a choice, not the default.
    */
   const nouvelExercice = useCallback(
     async (options: { inedit?: boolean } = {}) => {
@@ -266,7 +264,7 @@ export function useActionsRature({ etat, setEtat, aller }: Ctx) {
     [etat.resultat, etat.reglages, etat.demoId, etat.exercicesVus, setEtat, aller],
   )
 
-  /** Reprise après un échec : la même photo, sans re-choisir le fichier. */
+  /** Retry after a failure: the same photo, without re-selecting the file. */
   const reprendreAnalyse = useCallback(async () => {
     const fichier = etat.dernierFichier
     if (!fichier) return

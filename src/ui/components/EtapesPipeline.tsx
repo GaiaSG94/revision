@@ -11,7 +11,7 @@ const SYMBOLES: Record<string, string> = {
   sautee: '–',
 }
 
-/** Les six étapes du pipeline, visibles : l'attente devient une démonstration. */
+/** The six pipeline steps, made visible: waiting becomes a demonstration. */
 export function EtapesPipeline({ progression }: Props) {
   const parEtape = new Map(progression.map((p) => [p.etape, p]))
   return (

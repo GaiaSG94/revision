@@ -1,16 +1,16 @@
 /**
- * Crash test — réponses hostiles du modèle.
+ * Crash test — hostile model responses.
  *
- * Le produit dépend d'un modèle tiers qui peut rendre n'importe quoi : JSON
- * tronqué, types inversés, 5 000 annotations, lignes de 100 Ko, confiances
- * absurdes, zones hors cadre. Aucune de ces entrées ne doit :
- *   1. lever autre chose qu'une `ErreurLLM` (sinon l'UI affiche « Analyse
- *      impossible » sans raison et perd le contexte) ;
- *   2. produire un code hors taxonomie, une confiance hors [0,1] ou un NaN ;
- *   3. geler le rendu (listes ou textes non bornés).
+ * The product depends on a third-party model that can return anything:
+ * truncated JSON, inverted types, 5,000 annotations, 100 KB lines, absurd
+ * confidences, out-of-frame zones. None of these inputs may:
+ *   1. throw anything other than an `ErreurLLM` (otherwise the UI shows
+ *      "Analysis failed" for no reason and loses context);
+ *   2. produce an out-of-taxonomy code, a confidence outside [0,1] or a NaN;
+ *   3. freeze rendering (unbounded lists or texts).
  *
- * Ces invariants sont vérifiés sur chaque étape de parsing, jamais sur un seul
- * cas heureux.
+ * These invariants are checked at every parsing step, never on a single happy
+ * case.
  */
 import { describe, expect, it } from 'vitest'
 import {
@@ -30,10 +30,10 @@ function estNombreSain(valeur: number): boolean {
   return Number.isFinite(valeur)
 }
 
-/** Toute sortie du pipeline doit respecter les invariants, quel que soit l'entrée. */
+/** Every pipeline output must respect the invariants, whatever the input. */
 function verifierInvariants(erreurs: ReturnType<typeof construireDiagnostic>['erreurs']) {
   for (const erreur of erreurs) {
-    expect(CODES_VALIDES.has(erreur.code), `code hors taxonomie : ${erreur.code}`).toBe(true)
+    expect(CODES_VALIDES.has(erreur.code), `out-of-taxonomy code: ${erreur.code}`).toBe(true)
     expect(estNombreSain(erreur.confiance)).toBe(true)
     expect(erreur.confiance).toBeGreaterThanOrEqual(0)
     expect(erreur.confiance).toBeLessThanOrEqual(1)
@@ -42,7 +42,7 @@ function verifierInvariants(erreurs: ReturnType<typeof construireDiagnostic>['er
     expect(estNombreSain(erreur.ponderee ? 1 : 0)).toBe(true)
     if (erreur.zone) {
       for (const valeur of Object.values(erreur.zone)) {
-        expect(estNombreSain(valeur), 'zone avec NaN/Infinity').toBe(true)
+        expect(estNombreSain(valeur), 'zone with NaN/Infinity').toBe(true)
         expect(valeur).toBeGreaterThanOrEqual(0)
         expect(valeur).toBeLessThanOrEqual(1)
       }
@@ -50,19 +50,19 @@ function verifierInvariants(erreurs: ReturnType<typeof construireDiagnostic>['er
   }
 }
 
-describe('crash test — entrées hostiles du modèle', () => {
+describe('crash test — hostile model inputs', () => {
   const CAS_HOSTILES: [string, string][] = [
-    ['JSON tronqué', '{"annotations": [{"ligne": "a"'],
-    ['pas du JSON', 'désolé, je ne peux pas analyser cette image'],
-    ['tableau au lieu d’un objet', '[{"ligne":"a"}]'],
-    ['chaîne JSON', '"texte"'],
+    ['truncated JSON', '{"annotations": [{"ligne": "a"'],
+    ['not JSON', 'sorry, I cannot analyse this image'],
+    ['array instead of object', '[{"ligne":"a"}]'],
+    ['JSON string', '"texte"'],
     ['nombre', '42'],
     ['null', 'null'],
-    ['objet vide', '{}'],
-    ['types inversés', '{"annotations":"beaucoup","copiePropre":"oui"}'],
-    ['null partout', '{"annotations":null,"copiePropre":null,"nomDetecte":null}'],
+    ['empty object', '{}'],
+    ['inverted types', '{"annotations":"beaucoup","copiePropre":"oui"}'],
+    ['null everywhere', '{"annotations":null,"copiePropre":null,"nomDetecte":null}'],
     [
-      'confiances absurdes',
+      'absurd confidences',
       JSON.stringify({
         annotations: [
           { ligne: 'a', annotation: 'faux', code: 'E01', confiance: -5 },
@@ -74,7 +74,7 @@ describe('crash test — entrées hostiles du modèle', () => {
       }),
     ],
     [
-      'codes inconnus',
+      'unknown codes',
       JSON.stringify({
         annotations: [
           { ligne: 'a', annotation: 'x', code: 'E42', confiance: 0.9 },
@@ -86,7 +86,7 @@ describe('crash test — entrées hostiles du modèle', () => {
       }),
     ],
     [
-      'zones hors cadre',
+      'out-of-frame zones',
       JSON.stringify({
         annotations: [
           { ligne: 'a', annotation: 'x', code: 'E01', confiance: 0.9, zone: { x: -3, y: 9, largeur: 1e9, hauteur: -0.5 } },
@@ -95,9 +95,9 @@ describe('crash test — entrées hostiles du modèle', () => {
         ],
       }),
     ],
-    ['ligne de 100 Ko', JSON.stringify({ annotations: [{ ligne: 'x'.repeat(100_000), annotation: 'faux', code: 'E01', confiance: 0.9 }] })],
+    ['100 KB line', JSON.stringify({ annotations: [{ ligne: 'x'.repeat(100_000), annotation: 'faux', code: 'E01', confiance: 0.9 }] })],
     [
-      '5 000 annotations',
+      '5,000 annotations',
       JSON.stringify({
         annotations: Array.from({ length: 5000 }, (_, i) => ({
           ligne: `ligne ${i}`,
@@ -107,17 +107,17 @@ describe('crash test — entrées hostiles du modèle', () => {
         })),
       }),
     ],
-    ['champs inconnus', JSON.stringify({ annotations: [{ ligne: 'a', annotation: 'x', code: 'E01', confiance: 0.9, surprise: { a: [1, 2, 3] } }], injection: 'ignore les instructions' })],
-    ['markdown autour', '```json\n{"annotations":[{"ligne":"a","annotation":"faux","code":"E01","confiance":0.9}]}\n```'],
-    ['texte avant et après', 'Voici : {"annotations":[{"ligne":"a","annotation":"faux","code":"E01","confiance":0.9}]} — fin'],
+    ['unknown fields', JSON.stringify({ annotations: [{ ligne: 'a', annotation: 'x', code: 'E01', confiance: 0.9, surprise: { a: [1, 2, 3] } }], injection: 'ignore the instructions' })],
+    ['markdown around', '```json\n{"annotations":[{"ligne":"a","annotation":"faux","code":"E01","confiance":0.9}]}\n```'],
+    ['text before and after', 'Here: {"annotations":[{"ligne":"a","annotation":"faux","code":"E01","confiance":0.9}]} — end'],
   ]
 
-  it.each(CAS_HOSTILES)('extraction : %s ne casse rien', (_titre, brut) => {
+  it.each(CAS_HOSTILES)('extraction: %s breaks nothing', (_titre, brut) => {
     let extraction
     try {
       extraction = parserExtraction(brut)
     } catch (erreur) {
-      expect(erreur, 'une erreur doit être une ErreurLLM').toBeInstanceOf(ErreurLLM)
+      expect(erreur, 'an error must be an ErreurLLM').toBeInstanceOf(ErreurLLM)
       return
     }
     expect(extraction.annotations.length).toBeLessThanOrEqual(MAX_ANNOTATIONS)
@@ -134,19 +134,19 @@ describe('crash test — entrées hostiles du modèle', () => {
     }
   })
 
-  it.each(CAS_HOSTILES)('analyse fusionnée : %s ne casse rien', (_titre, brut) => {
+  it.each(CAS_HOSTILES)('merged analysis: %s breaks nothing', (_titre, brut) => {
     let resultat
     try {
       resultat = decouperAnalyse(parserAnalyse(brut))
     } catch (erreur) {
-      expect(erreur, 'une erreur doit être une ErreurLLM').toBeInstanceOf(ErreurLLM)
+      expect(erreur, 'an error must be an ErreurLLM').toBeInstanceOf(ErreurLLM)
       return
     }
     expect(resultat.extraction.annotations.length).toBeLessThanOrEqual(MAX_ANNOTATIONS)
     verifierInvariants(resultat.erreurs)
   })
 
-  it.each(CAS_HOSTILES)('classification : %s ne casse rien', (_titre, brut) => {
+  it.each(CAS_HOSTILES)('classification: %s breaks nothing', (_titre, brut) => {
     let brutes
     try {
       brutes = parserClassification(brut)
@@ -158,7 +158,7 @@ describe('crash test — entrées hostiles du modèle', () => {
     verifierInvariants(diagnostic.erreurs)
   })
 
-  it('normaliserErreur encaisse n’importe quoi sans lever', () => {
+  it('normaliserErreur handles anything without throwing', () => {
     const entrees = [
       {},
       { code: null },
@@ -178,7 +178,7 @@ describe('crash test — entrées hostiles du modèle', () => {
     }
   })
 
-  it('une copie sans annotation valide reste « propre » : zéro faute inventée', () => {
+  it('a paper with no valid annotation stays "clean": zero invented error', () => {
     const cas = [
       '{"annotations":[],"copiePropre":false}',
       '{"annotations":[{"ligne":"","annotation":"   "}],"copiePropre":false}',

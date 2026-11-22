@@ -6,7 +6,7 @@ import { Carte } from './Carte'
 
 type Props = { stats: StatsClasse }
 
-/** Carte « quoi reprendre lundi » : la décision, pas seulement les compteurs. */
+/** "What to review on Monday" card: the decision, not just the counters. */
 export function CarteLundi({ stats }: Props) {
   const plan = quoiReprendreLundi(stats)
   const total = CODES_ERREUR.reduce((s, c) => s + (estPonderee(c) ? stats.parType[c] ?? 0 : 0), 0)

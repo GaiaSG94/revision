@@ -1,71 +1,73 @@
-# InferHub — diagnostic du compte et leviers
+# InferHub — account diagnosis and levers
 
-Source : recherche en direct du 12/11 sur <https://inferhub.dev> (homepage, `/docs/api`, `/pricing`)
-et l'API de gestion `https://inferhub.dev/api` (avec la clé).
+Source: live research from 12 November 2026 on <https://inferhub.dev> (homepage, `/docs/api`,
+`/pricing`) and the management API `https://inferhub.dev/api` (authenticated).
 
-## Ce qu'est InferHub
+Private account details (balances, key names, key fragments) are intentionally omitted from this
+document. See [`../SECURITY.md`](../SECURITY.md).
 
-Une **place de marché** d'inférence : des éditeurs proposent leurs modèles (Claude, Codex,
-GLM, DeepSeek, Qwen…) à un prix « ask » en USDC par million de tokens ; le consommateur appelle
-**une seule API** [OI]-/Anthropic-compatible (`https://api.inferhub.dev/v1`) et est routé vers le
-fournisseur le moins cher qui a de la capacité. Une clé = deux protocoles (`/v1/chat/completions`,
-`/v1/messages`), plus une **API de gestion** (`GET /api/me`, `/api/keys`, `/api/budgets`,
-`/api/catalog`, `/api/market`).
+## What InferHub is
 
-## État de notre compte (mesuré le 12/11)
+An inference **marketplace**: publishers offer their models (Claude, Codex, GLM, DeepSeek, Qwen…)
+at an "ask" price in USDC per million tokens; the consumer calls **one** [OI]-/Anthropic-compatible
+API (`https://api.inferhub.dev/v1`) and is routed to the cheapest provider with capacity. One key
+covers two protocols (`/v1/chat/completions`, `/v1/messages`), plus a **management API**
+(`GET /api/me`, `/api/keys`, `/api/budgets`, `/api/catalog`, `/api/market`).
 
-| Élément | Valeur |
+## Account state (measured 12 November 2026)
+
+| Item | Finding |
 |---|---|
-| Solde consommateur | **22,83 USDC** |
-| Clés | `app` (sk-airo-4pKV…), `mac-opencode`, `essec`, `duello`, … — aucune n'a de restriction `allowedUpstreams`/`allowedModels` |
-| Modèles qui passent | famille **`ag/`** (Antigravity, première partie) + famille **`zai/`** (Z.AI GLM Coding Plan) |
-| Modèles qui échouent | `ali/`, `oai/`, `cb/`, `cc/`, `cbc`… → `402 no_provider_under_bid` ou `403 model disabled in your preferences` |
+| Consumer balance | not reproduced here (private account information) |
+| Keys | several named keys were used; none had `allowedUpstreams`/`allowedModels` restrictions. Names and fragments are omitted |
+| Models that pass | family **`ag/`** (Antigravity, first party) + family **`zai/`** (Z.AI GLM Coding Plan) |
+| Models that fail | `ali/`, `oai/`, `cb/`, `cc/`, `cbc`… → `402 no_provider_under_bid` or `403 model disabled in your preferences` |
 
-## Pourquoi les autres familles renvoient 402/403
+## Why the other families return 402/403
 
-Le catalogue public liste 287 modèles, mais l'ensemble effectif de la clé vaut :
+The public catalogue lists 287 models, but the effective set for a key is:
 
-    réglages « Models & pricing » du compte  ∩  budgets  ∩  allowlist de la clé
+    account "Models & pricing" settings  ∩  budgets  ∩  key allowlist
 
-Or le compte applique un **seuil de remise** (`minDiscountPct ≈ 98,90` dans `/api/budgets`) et
-un **prix maximal** par jeton : les modèles dont l'ask dépasse ce plafond sont renvoyés en
-`402 no_provider_under_bid`. Les `ag/*` (remisés à ~99 %) et les `zai/*` passent ; les autres non.
+The account applies a **discount threshold** (`minDiscountPct ≈ 98.90` in `/api/budgets`) and a
+**maximum price** per token: models whose ask exceeds that ceiling are returned as
+`402 no_provider_under_bid`. `ag/*` (discounted by ~99%) and `zai/*` pass; the others do not.
 
-> L'en-tête `x-max-input-price` / `x-max-output-price` **ne remplace pas** ce plafond de compte :
-> testé à 0,5 / 3 USDC → toujours 402. C'est le plafond du compte qui est contraignant.
+> The `x-max-input-price` / `x-max-output-price` headers **do not replace** the account ceiling:
+> tested at 0.5 / 3 USDC → still 402. The account ceiling is the binding constraint.
 
-## Les deux leviers pour débloquer ~200 modèles de plus
+## The two levers to unlock roughly 200 more models
 
-1. **Dashboard** → *Models & pricing* (ou *Budgets*) : relever le prix maximal accepté, ou activer
-   les familles voulues (Ali Qwen, OpenAI, CodeBuddy…).
-2. **API** : `PUT /api/budgets/{id}` avec `maxInputPerMtok` / `maxOutputPerMtok` / `enabled`.
-   (Voir « Common endpoints › Routing › `PUT /api/budgets/{id}` » dans `/docs/api`.)
+1. **Dashboard** → *Models & pricing* (or *Budgets*): raise the maximum accepted price, or enable
+   the wanted families (Ali Qwen, OpenAI, CodeBuddy…).
+2. **API**: `PUT /api/budgets/{id}` with `maxInputPerMtok` / `maxOutputPerMtok` / `enabled`.
+   (See "Common endpoints › Routing › `PUT /api/budgets/{id}`" in `/docs/api`.)
 
-## Modèles vision intéressants, classés par prix d'entrée (au marché)
+## Vision models of interest, sorted by input price (market ask)
 
-| Modèle | Famille | minAsk in (USDC/Mtok) | Autorisé aujourd'hui |
+| Model | Family | minAsk in (USDC/Mtok) | Allowed today |
 |---|---|---|---|
-| `zai/glm-4.6v` | Z.AI GLM | **0,0003** | ✅ (déjà ajouté à notre chaîne) |
-| `ag/gemini-3.8-flash-high` | Antigravity | 0,00075 | ✅ |
-| `ali/qwen3.8-27b` | Qwencloud | 0,0035 | ❌ 402 |
-| `cb/minimax-m3.1-flash` | CodeBuddy | 0,00555 | ❌ 503 (capacité) |
-| `ali/deepseek-v4.1-flash` | Qwencloud | 0,0147 | ❌ 402 |
+| `zai/glm-4.6v` | Z.AI GLM | **0.0003** | ✅ (already added to our chain) |
+| `ag/gemini-3.8-flash-high` | Antigravity | 0.00075 | ✅ |
+| `ali/qwen3.8-27b` | Qwencloud | 0.0035 | ❌ 402 |
+| `cb/minimax-m3.1-flash` | CodeBuddy | 0.00555 | ❌ 503 (capacity) |
+| `ali/deepseek-v4.1-flash` | Qwencloud | 0.0147 | ❌ 402 |
 
-`zai/glm-4.6v` (vision, ~0,0003/Mtok) est **déjà utilisable** avec la clé actuelle : il a été
-ajouté à la chaîne de repli du produit (`src/domain/config.ts`) et du proxy. Mesuré le 12/11 :
-familie autorisée mais **capacité souvent saturée** (429 « 168 providers at concurrency limit ») —
-ce que la chaîne + le disjoncteur absorbent.
+`zai/glm-4.6v` (vision, ~0.0003/Mtok) is **already usable** with the current key: it was added to
+the product's fallback chain (`src/domain/config.ts`) and to the proxy. Measured on 12 November
+2026: family allowed but **capacity often saturated** (429 "168 providers at concurrency limit") —
+which the chain and the circuit breaker absorb.
 
-## Ce que le produit en fait déjà (aucune de ces idées n'exige de quitter InferHub)
+## What the product already does (none of these ideas require leaving InferHub)
 
-- **Chaîne de repli (serveur + client)** : un 402/503/429 passe au modèle suivant.
-- **Disjoncteur** : un modèle en panne est mis en cooldown 60 s côté proxy.
-- **Combo natif** : InferHub propose des modèles virtuels `combo/<slug>` qui font exactement ce
-  failover, budget-aware. Piste à explorer (`POST /api/combos`) — remplacerait notre chaîne
-  maison par un nom de modèle unique, si un combo vision existe.
-- **`free/<slug>/<model>`** : modèles gratuits (best-effort) — `GET /api/catalog` pour les lister.
+- **Fallback chain (server + client)**: a 402/503/429 moves to the next model.
+- **Circuit breaker**: a failing model is put in a 60 s cooldown on the proxy side.
+- **Native combo**: InferHub offers virtual `combo/<slug>` models that do exactly this failover,
+  budget-aware. Worth exploring (`POST /api/combos`) — it would replace our home-made chain with a
+  single model name, if a vision combo exists.
+- **`free/<slug>/<model>`**: best-effort free models — `GET /api/catalog` to list them.
 
-## Recommandation pour le jour J
+## Recommendation for the day
 
-Le soir, `ag/*` suffit (16 s mesurés). En journée, la saturation est globale : **les 2 leviers
-ci-dessus (dashboard) sont le seul moyen de multiplier la capacité** sans quitter InferHub.
+In the evening, `ag/*` is enough (16 s measured). During the day, saturation is global: **the two
+dashboard levers above are the only way to multiply capacity** without leaving InferHub.

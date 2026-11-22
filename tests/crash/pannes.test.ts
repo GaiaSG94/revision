@@ -1,8 +1,8 @@
 /**
- * Crash test — pannes. Réseau coupé, proxy mort, amont saturé (503/402), quota
- * dépassé, corps de réponse invalide : le produit doit **dégradér proprement**,
- * c'est-à-dire lever une `ErreurLLM` lisible (jamais une `SyntaxError` ni une
- * Promesse), en un nombre d'appels borné, et sans boucle infinie.
+ * Crash test — failures. Network down, dead proxy, saturated upstream (503/402),
+ * quota exceeded, invalid response body: the product must **degrade cleanly**,
+ * i.e. throw a readable `ErreurLLM` (never a `SyntaxError` nor a Promise), with
+ * a bounded number of calls and no infinite loop.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CHAINE_MODELES } from '../../src/domain/config'
@@ -26,8 +26,8 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('crash test — pannes réseau et amont', () => {
-  it('réseau coupé : un seul appel, ErreurLLM lisible (pas de boucle)', async () => {
+describe('crash test — network and upstream failures', () => {
+  it('network down: one call, readable ErreurLLM (no loop)', async () => {
     const fetchMock = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
     vi.stubGlobal('fetch', fetchMock)
 
@@ -37,7 +37,7 @@ describe('crash test — pannes réseau et amont', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('toute la chaîne saturée : exactement un appel par modèle, puis l’erreur réelle', async () => {
+  it('whole chain saturated: exactly one call per model, then the real error', async () => {
     const fetchMock = vi
       .fn()
       .mockImplementation(async () => reponseBrute(503, '{"erreur":"no available provider"}'))
@@ -49,7 +49,7 @@ describe('crash test — pannes réseau et amont', () => {
     expect(fetchMock).toHaveBeenCalledTimes(CHAINE_MODELES.length)
   })
 
-  it('panaches de pannes (503, 402, 500, 504) : on finit par aboutir', async () => {
+  it('mixed failures (503, 402, 500, 504): eventually succeeds', async () => {
     const statuts = [503, 402, 500, 504]
     let appel = 0
     const fetchMock = vi.fn().mockImplementation(async () => {
@@ -65,11 +65,11 @@ describe('crash test — pannes réseau et amont', () => {
     expect(appel).toBe(5)
   })
 
-  it('quota du proxy : un seul appel, et le message propose le BYOK', async () => {
+  it('proxy quota: one call, and the message offers BYOK', async () => {
     const fetchMock = vi
       .fn()
       .mockImplementation(async () =>
-        reponseBrute(429, '{"erreur":"Quota du proxy atteint pour cette heure.","quota":"proxy"}'),
+        reponseBrute(429, '{"erreur":"Proxy quota reached for this hour.","quota":"proxy"}'),
       )
     vi.stubGlobal('fetch', fetchMock)
 
@@ -78,7 +78,7 @@ describe('crash test — pannes réseau et amont', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
-  it('429 amont puis 503 partout : nombre d’appels borné (pas de tempête)', async () => {
+  it('upstream 429 then 503 everywhere: bounded calls (no storm)', async () => {
     let appel = 0
     const fetchMock = vi.fn().mockImplementation(async () => {
       appel += 1
@@ -87,13 +87,13 @@ describe('crash test — pannes réseau et amont', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     await completer(transport, requete).catch(() => undefined)
-    // 1er modèle : 429 puis une seconde chance ; les 5 autres : 1 appel chacun.
+    // 1st model: 429 then a second chance; the other 5: 1 call each.
     expect(appel).toBeLessThanOrEqual(CHAINE_MODELES.length + 1)
   }, 20_000)
 
-  it('budget global : la chaîne s’arrête au lieu de faire attendre 9 minutes', async () => {
-    // L'horloge avance de 90 s à chaque lecture : avec un budget de 200 s, la
-    // chaîne doit s'arrêter avant d'avoir épuisé les six modèles.
+  it('global budget: the chain stops instead of waiting 9 minutes', async () => {
+    // The clock advances 90 s per read: with a 200 s budget, the chain must
+    // stop before exhausting all six models.
     let maintenant = 1_700_000_000_000
     const horloge = vi.spyOn(Date, 'now').mockImplementation(() => {
       const valeur = maintenant
@@ -106,17 +106,17 @@ describe('crash test — pannes réseau et amont', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const erreur = await completer(transport, requete).catch((e: unknown) => e)
-    // Horloge rétablie AVANT les assertions : un échec ici ne doit pas fausser
-    // le temps des tests suivants (budget « dépassé » en cascade).
+    // Clock restored BEFORE the assertions: a failure here must not skew
+    // the timing of following tests (cascading "over budget").
     horloge.mockRestore()
     expect(erreur).toBeInstanceOf(ErreurLLM)
     expect((erreur as ErreurLLM).message).toContain('too slow')
-    // Le budget doit couper la chaîne avant la fin, quelles que soient les bornes.
+    // The budget must cut the chain short, whatever the bounds.
     expect(fetchMock.mock.calls.length).toBeLessThan(CHAINE_MODELES.length)
     expect(fetchMock.mock.calls.length).toBeGreaterThan(0)
   })
 
-  it('corps invalide ou vide : ErreurLLM, jamais une SyntaxError', async () => {
+  it('invalid or empty body: ErreurLLM, never a SyntaxError', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockImplementation(async () => new Response('<html>502 Bad Gateway</html>', { status: 200 })),
@@ -130,14 +130,14 @@ describe('crash test — pannes réseau et amont', () => {
     expect((erreurVide as ErreurLLM).message).toContain('Empty')
   })
 
-  it('génération d’exercice en panne : l’erreur remonte, elle n’est pas avalée', async () => {
-    const client = clientSimule([]) // aucune réponse : lève dès le premier appel
+  it('exercise generation failure: the error propagates, not swallowed', async () => {
+    const client = clientSimule([]) // no response: throws on the first call
     await expect(
       genererExerciceVerifie({ typeDominant: 'E01', extraitCopie: 'x', transport, client }),
     ).rejects.toThrow()
   })
 
-  it('seconde passe : un verdict hostile ne corrompt pas la liste des fautes', async () => {
+  it('second pass: a hostile verdict does not corrupt the error list', async () => {
     const erreurs: Erreur[] = [
       { code: 'E01', libelle: 'l', ligne: 'a', explication: 'e', confiance: 0.7, ponderee: true },
       { code: 'E04', libelle: 'l', ligne: 'b', explication: 'e', confiance: 0.65, ponderee: true },
@@ -145,23 +145,23 @@ describe('crash test — pannes réseau et amont', () => {
     ]
     const indices = indicesASurveiller(erreurs)
     const verdictsPourris = [
-      { index: 99, code: 'E12', confiance: 0.9, explication: 'hors liste', decision: 'reclasse' },
-      { index: -3, code: 'E12', confiance: 0.9, explication: 'négatif', decision: 'reclasse' },
+      { index: 99, code: 'E12', confiance: 0.9, explication: 'out of list', decision: 'reclasse' },
+      { index: -3, code: 'E12', confiance: 0.9, explication: 'negative', decision: 'reclasse' },
       { index: 0, code: 'PAS_UN_CODE', confiance: 5, explication: '', decision: 'x' },
     ]
     const { erreurs: revues } = appliquerRevue(erreurs, indices, verdictsPourris)
     expect(revues).toHaveLength(erreurs.length)
-    // La faute hors revue (confiance 0,95) est intacte.
+    // The out-of-review error (confidence 0.95) is intact.
     expect(revues[2]).toEqual(erreurs[2])
-    // Les index hors liste (99, -3) ne touchent rien.
+    // Out-of-list indices (99, -3) change nothing.
     const touchees = revues.filter((erreur, index) => erreur.code !== erreurs[index]!.code)
     expect(touchees).toHaveLength(1)
-    // Le code inconnu retombe sur E99, jamais sur une invention.
+    // The unknown code falls back to E99, never an invention.
     expect(touchees[0]!.code).toBe('E99')
     expect(revues.every((erreur) => erreur.ligne.length > 0)).toBe(true)
   })
 
-  it('seconde passe en panne : les fautes d’origine sont conservées telles quelles', async () => {
+  it('second pass failure: original errors are kept unchanged', async () => {
     const erreurs: Erreur[] = [
       { code: 'E01', libelle: 'l', ligne: 'a', explication: 'e', confiance: 0.7, ponderee: true },
     ]
@@ -171,8 +171,8 @@ describe('crash test — pannes réseau et amont', () => {
   })
 })
 
-describe('crash test — quota du proxy sous charge', () => {
-  it('500 visiteurs × 40 appels : les plafonds tiennent, la mémoire reste bornée', () => {
+describe('crash test — proxy quota under load', () => {
+  it('500 visitors × 40 calls: caps hold, memory stays bounded', () => {
     const quota = creerQuota({ parIpParHeure: 20, globalParJour: 2000 })
     const maintenant = 1_700_000_000_000
     let autorises = 0
@@ -181,15 +181,15 @@ describe('crash test — quota du proxy sous charge', () => {
       for (let appel = 0; appel < 40; appel += 1) {
         if (quota.autoriser(`ip-${visiteur}`, maintenant + appel)) accepts += 1
       }
-      expect(accepts, `visiteur ${visiteur} au-delà du plafond`).toBeLessThanOrEqual(20)
+      expect(accepts, `visitor ${visiteur} over the cap`).toBeLessThanOrEqual(20)
       autorises += accepts
     }
     expect(autorises).toBeLessThanOrEqual(2000)
     expect(quota.restant('ip-0', maintenant + 100)).toBe(0)
-    expect(quota.restant('jamais-vu', maintenant + 100)).toBe(0) // plafond global atteint
+    expect(quota.restant('jamais-vu', maintenant + 100)).toBe(0) // global cap reached
   })
 
-  it('aucun dépassement après bascule de jour', () => {
+  it('no overshoot after the day rolls over', () => {
     const quota = creerQuota({ parIpParHeure: 2, globalParJour: 3 })
     const maintenant = 1_700_000_000_000
     expect(quota.autoriser('a', maintenant)).toBe(true)
@@ -200,8 +200,8 @@ describe('crash test — quota du proxy sous charge', () => {
   })
 })
 
-describe('crash test — données corrompues en stockage local', () => {
-  it('un diagnostic abîmé (erreurs à null) n’effondre pas l’agrégation', () => {
+describe('crash test — corrupted local storage data', () => {
+  it('a damaged diagnosis (null errors) does not break aggregation', () => {
     const corrompu = {
       id: 'x',
       createdAt: 'date-invalide',
@@ -212,17 +212,17 @@ describe('crash test — données corrompues en stockage local', () => {
     }
     const avant = profilVide()
     const apres = agreger(avant, corrompu)
-    // Le diagnostic illisible est ignoré, pas compté : le profil reste sain.
+    // The unreadable diagnosis is ignored, not counted: the profile stays healthy.
     expect(apres.totalAnalyses).toBe(0)
     expect(totalPondere(apres)).toBe(0)
   })
 
-  it('un diagnostic sans champs tient debout', () => {
+  it('a diagnosis with no fields still stands', () => {
     const squelette = { erreurs: [] } as unknown as Parameters<typeof agreger>[1]
     expect(() => agreger(profilVide(), squelette)).not.toThrow()
   })
 
-  it('construire un diagnostic sans aucune faute reste cohérent', () => {
+  it('building a diagnosis with no error stays consistent', () => {
     const diagnostic = construireDiagnostic([], { id: 'vide', createdAt: '2026-11-12T12:00:00.000Z' })
     expect(diagnostic.nbFautes).toBe(0)
     expect(diagnostic.erreurs).toEqual([])

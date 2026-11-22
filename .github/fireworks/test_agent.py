@@ -1,36 +1,36 @@
 #!/usr/bin/env python3
-"""Agent de réparation des échecs de CI (zeroclaw `fw`) pour pr-auto-merge.
+"""CI failure repair agent (zeroclaw `fw`) for pr-auto-merge.
 
-Quand une PR est `BLOCKED` sur un échec **réel** (un test rouge, une garde
-rouge — pas une panne d'infra), le balayeur appelle ce pilote dans son clone :
+When a PR is `BLOCKED` on a **real** failure (a red test, a red guard — not
+an infra outage), the sweeper calls this driver in its clone:
 
-1. il lit le journal des runs en échec de la tête (check-runs en REST) ;
-2. il lance l'agent **zeroclaw `fw`** (`zeroclaw agent --agent fw -m`) sur le
-   clone, avec un prompt qui porte les erreurs réelles ;
-3. l'agent modifie des fichiers, **il ne commit pas et ne pousse pas** : le
-   pilote garde le contrôle. Il refuse tout changement dans `.github/`, dans
-   `.mergify.yml`, au-delà de 20 fichiers ou 1 500 lignes ;
-4. il compile les modules touchés (`compilation_gate.py`) — un correctif qui
-   ne compile pas n'est jamais poussé ;
-5. il commit avec l'identité du propriétaire et pousse avec bail.
+1. it reads the failed-run logs of the head (check-runs over REST);
+2. it launches the **zeroclaw `fw`** agent (`zeroclaw agent --agent fw -m`) on
+   the clone, with a prompt carrying the real errors;
+3. the agent modifies files, **it does not commit or push**: the driver keeps
+   control. It refuses any change in `.github/`, in `.mergify.yml`, beyond
+   20 files or 1,500 lines;
+4. it compiles the touched modules (`compilation_gate.py`) — a fix that does
+   not compile is never pushed;
+5. it commits with the owner's identity and pushes with a lease.
 
-Une seule tentative par tête (`<!-- test-agent sha=<tête> -->`) : un agent ne
-boucle pas. Coupe-circuit : variable de dépôt `TEST_AGENT=0`.
+One attempt per head (`<!-- test-agent sha=<head> -->`): an agent does not
+loop. Circuit breaker: repository variable `TEST_AGENT=0`.
 
-L'agent tourne dans un `--config-dir` isolé (copie de `config.toml` et de
-`.secret_key`) : le démon ZeroClaw du runner tient le verrou de son propre
-état, un agent concurrent refuserait de démarrer. Sur un runner sans
-`zeroclaw`, le pilote le dit et rend 2 (rien à faire) — la PR reste visible
-avec son compte rendu.
+The agent runs in an isolated `--config-dir` (copy of `config.toml` and
+`.secret_key`): the runner's ZeroClaw daemon holds its own state lock, a
+concurrent agent would refuse to start. On a runner without `zeroclaw`, the
+driver says so and returns 2 (nothing to do) — the PR stays visible with its
+report.
 
-Bibliothèque standard uniquement. Usage :
+Standard library only. Usage:
 
   python3 test_agent.py fix --repo O/R --pr 12 --branch feat/x --sha <sha>
 
-Codes : 0 = correctif poussé ; 1 = échec (compte rendu sur la PR) ; 2 = rien
-à faire (désactivé, déjà tenté, aucun changement proposé) ; 3 = outillage
-absent sur le runner (`zeroclaw` ou sa config) — **aucune tentative consommée**,
-le balayeur réessaiera au passage suivant.
+Codes: 0 = fix pushed; 1 = failure (report on the PR); 2 = nothing
+to do (disabled, already tried, no change proposed); 3 = tooling
+missing on the runner (`zeroclaw` or its config) — **no attempt consumed**,
+the sweeper will retry on the next pass.
 """
 
 import argparse
@@ -42,23 +42,23 @@ import tempfile
 import time
 import types
 
-BUDGET_S = 150            # temps laissé à l'agent, dans un job de 5 min
+BUDGET_S = 150            # time allowed to the agent, in a 5 min job
 MAX_FICHIERS = 20
 MAX_LIGNES = 1_500
 MAX_JOURNAL_LIGNES = 120
 REFUSES = (".github/", ".mergify.yml")
-# Sorties d'outils (Gradle notamment) : elles apparaissent dans le clone quand
-# l'agent a lancé une compilation, et n'ont rien à faire dans le correctif
-# (vécu : `.kotlin/` commité sur la PR de test #652).
+# Tool outputs (Gradle in particular): they appear in the clone when the
+# agent ran a compilation, and have no place in the fix
+# (seen: `.kotlin/` committed on test PR #652).
 JAMAIS_COMMITES = (".kotlin/", "build/", ".gradle/", ".idea/", ".git/")
-# Mêmes exclusions côté git (pathspec) : le commit ne prend que du code.
+# Same exclusions on the git side (pathspec): the commit only takes code.
 EXCLUSIONS_GIT = ("--", ":(exclude).kotlin/**", ":(exclude)**/build/**",
                   ":(exclude).gradle/**", ":(exclude).idea/**")
 MARK = "<!-- test-agent sha=%s -->"
-# Préfixe des sorties d'infrastructure : un runner non provisionné n'est pas un
-# échec de l'agent, donc on ne pose **aucune marque** et l'essai de la tête
-# reste ouvert. Vécu le 31/10 sur #652 : `zeroclaw introuvable` a brûlé l'unique
-# tentative deux minutes avant la pose du binaire sur r630.
+# Prefix for infrastructure outputs: an unprovisioned runner is not an
+# agent failure, so we set **no marker** and the head's attempt stays open.
+# Seen on 31/10 on #652: `zeroclaw not found` burned the only attempt two
+# minutes before the binary was installed on r630.
 INFRA = "OUTILLAGE: "
 LABEL_OK = "agent-test"
 LABEL_HUMAN = "intervention-humaine"
@@ -70,7 +70,7 @@ MOTIFS_JOURNAL = ("FAILED", "AssertionError", "Expected", "expected:",
 
 
 def _charger(nom):
-    """Module voisin : import direct, sinon `origin/main` (branche antérieure)."""
+    """Neighbouring module: direct import, otherwise `origin/main` (earlier branch)."""
     try:
         return __import__(nom)
     except ImportError:
@@ -96,7 +96,7 @@ def log(message):
 
 
 def sh(args, **kw):
-    """Exécute une commande, rend sa sortie dépouillée ; lève sinon."""
+    """Runs a command, returns its stripped output; raises otherwise."""
     proc = subprocess.run(args, capture_output=True, text=True, **kw)
     if proc.returncode != 0:
         raise RuntimeError("%s : %s" % (" ".join(args[:3]),
@@ -105,7 +105,7 @@ def sh(args, **kw):
 
 
 def jeton_ecriture():
-    """Token des écritures : le PAT quand il est là (identité du propriétaire)."""
+    """Write token: the PAT when present (owner identity)."""
     return os.environ.get("GH_ECRITURE") or os.environ.get("GH_TOKEN") or ""
 
 
@@ -118,14 +118,14 @@ def _gh(args, jeton=None, saisie=None):
 
 
 def comment(repo, pr, body):
-    """Commente la PR ; best-effort, ne lève jamais."""
+    """Comments on the PR; best-effort, never throws."""
     try:
         proc = _gh(["pr", "comment", str(pr), "--repo", repo, "--body",
                     PREFIXE + "\n\n" + body], jeton=jeton_ecriture())
         if proc.returncode != 0:
-            log("commentaire refusé : %s" % (proc.stderr or "").strip()[:150])
+            log("comment refused: %s" % (proc.stderr or "").strip()[:150])
     except Exception as exc:                                   # noqa: BLE001
-        log("commentaire impossible : %s" % exc)
+        log("comment impossible: %s" % exc)
 
 
 def add_label(repo, pr, label):
@@ -133,7 +133,7 @@ def add_label(repo, pr, label):
         _gh(["pr", "edit", str(pr), "--repo", repo, "--add-label", label],
             jeton=jeton_ecriture())
     except Exception as exc:                                   # noqa: BLE001
-        log("label %s impossible : %s" % (label, exc))
+        log("label %s impossible: %s" % (label, exc))
 
 
 def labels(repo, pr):
@@ -145,14 +145,14 @@ def labels(repo, pr):
 
 
 def marque_presente(repo, pr, marque):
-    """Vrai si un commentaire de la PR porte déjà cette marque."""
+    """True if a PR comment already carries this marker."""
     proc = _gh(["api", "repos/%s/issues/%s/comments?per_page=100" % (repo, pr),
                 "--jq", ".[].body"], jeton=os.environ.get("GH_TOKEN"))
     return proc.returncode == 0 and marque in (proc.stdout or "")
 
 
 def runs_en_echec(repo, sha):
-    """Ids des runs en échec de la tête (checks requis et moitiés)."""
+    """Ids of the head’s failed runs (required checks and halves)."""
     proc = _gh(["api", "repos/%s/commits/%s/check-runs?per_page=100"
                 % (repo, sha), "--jq",
                 '[.check_runs[] | select(.conclusion == "failure") | .html_url]'
@@ -166,7 +166,7 @@ def runs_en_echec(repo, sha):
 
 
 def extrait_journal(runs, limite=MAX_JOURNAL_LIGNES):
-    """Lignes utiles des journaux en échec (best-effort, jamais d'échec)."""
+    """Useful lines from failure logs (best-effort, never fails)."""
     garde = []
     for run in runs[:3]:
         proc = _gh(["run", "view", str(run), "--log-failed"],
@@ -175,54 +175,54 @@ def extrait_journal(runs, limite=MAX_JOURNAL_LIGNES):
             texte = ligne.split("\t")[-1].rstrip()
             if any(motif in texte for motif in MOTIFS_JOURNAL):
                 garde.append(texte)
-    # Les lignes les plus proches de la fin portent le verdict : on garde la queue.
+    # Lines closest to the end carry the verdict: we keep the tail.
     return "\n".join(garde[-limite:])
 
 
 def prompt_fix(repo, pr, dossier, extrait, etapes="", indice=""):
-    """Prompt de réparation : le dépôt, les erreurs, les règles, le verdict.
+    """Repair prompt: the repository, the errors, the rules, the verdict.
 
-    [indice] = verdict de `tools/triage_test.py` (workflow `triage-rouge`) :
-    sans lui, l'agent cherche à l'aveugle et rend « budget dépassé » (#919).
+    [indice] = verdict of `tools/triage_test.py` (workflow `triage-rouge`):
+    without it, the agent searches blindly and returns 'budget exceeded' (#919).
     """
     if indice.strip():
-        etapes = etapes or "après triage"
+        etapes = etapes or "after triage"
     return "\n".join([
-        "Tu es l'agent de réparation de la CI de %s (application Android "
-        "Kotlin/KMP, code et commentaires en français)." % repo,
-        "Le clone git est %s, sur la branche de la PR #%s." % (dossier, pr),
-        "La CI y échoue%s." % (" sur : %s" % etapes if etapes else ""),
+        "You are the CI repair agent for %s (Android "
+        "Kotlin/KMP app, code and comments in English)." % repo,
+        "The git clone is %s, on the branch of PR #%s." % (dossier, pr),
+        "CI fails there%s." % (" on: %s" % etapes if etapes else ""),
         "",
-        "Extrait du journal d'échec :",
+        "Excerpt from the failure log:",
         "```",
-        extrait or "(journal indisponible)",
+        extrait or "(log unavailable)",
         "```",
-    ] + (["", "Triage automatique (déjà fait, ne le refais pas) :", "",
+    ] + (["", "Automatic triage (already done, do not redo it):", "",
           indice.strip()] if indice.strip() else []) + [
         "",
-        "Mission : corriger la CAUSE, au plus petit diff possible.",
-        "Règles strictes :",
-        "- ne touche jamais .github/, .mergify.yml, ni un fichier de garde ;",
-        "- ne commit pas, ne pousse pas, ne change pas de branche ;",
-        "- au plus %d fichiers et %d lignes modifiées ;" % (MAX_FICHIERS,
+        "Mission: fix the CAUSE, with the smallest possible diff.",
+        "Strict rules:",
+        "- never touch .github/, .mergify.yml, or a guard file;",
+        "- do not commit, do not push, do not change branches;",
+        "- at most %d files and %d lines changed;" % (MAX_FICHIERS,
                                                             MAX_LIGNES),
-        "- garde le style du dépôt (commentaires en français, phrases utiles) ;",
-        "- si la correction propre sort du cadre (produit, contrat), ne modifie "
-        "rien et réponds ABANDON.",
-        "- tu peux vérifier en local (`python3 -m unittest tools/test_X.py` "
-        "ou `./gradlew :core:testDebugUnitTest --tests \"*Nom*\"`), mais le "
-        "temps est compté : la CI rejugera.",
+        "- keep the repository style (comments in English, useful sentences);",
+        "- if a clean fix falls outside the scope (product, contract), change "
+        "nothing and answer ABANDON.",
+        "- you may check locally (`python3 -m unittest tools/test_X.py` "
+        "or `./gradlew :core:testDebugUnitTest --tests \"*Name*\"`), but "
+        "time is limited: CI will re-judge.",
         "",
-        "Termine par une seule ligne : `CORRIGÉ <fichiers>` ou "
-        "`ABANDON <raison>`.",
+        "Finish with a single line: `FIXED <files>` or "
+        "`ABANDON <reason>`.",
     ])
 
 
 def config_isolee(source=None):
-    """`--config-dir` isolé : copie config.toml + .secret_key, mode 700.
+    """Isolated `--config-dir`: copy of config.toml + .secret_key, mode 700.
 
-    Le démon ZeroClaw du runner tient le verrou de son état ; un `zeroclaw
-    agent` concurrent refuserait de démarrer. Copie locale, supprimée après.
+    The runner's ZeroClaw daemon holds its state lock; a concurrent
+    `zeroclaw agent` would refuse to start. Local copy, deleted afterwards.
     """
     source = source or os.path.expanduser("~/.zeroclaw")
     conf = os.path.join(source, "config.toml")
@@ -232,8 +232,8 @@ def config_isolee(source=None):
     dossier = tempfile.mkdtemp(prefix="zc-agent-")
     os.chmod(dossier, 0o700)
     try:
-        # `data/` doit exister en 700 AVANT le lancement : ZeroClaw le crée au
-        # umask du processus (002 sur les runners) et refuse un état partagé.
+        # `data/` must exist with mode 700 BEFORE launch: ZeroClaw creates it at the
+        # process umask (002 on runners) and refuses a shared state.
         os.makedirs(os.path.join(dossier, "data"), mode=0o700, exist_ok=True)
         os.chmod(os.path.join(dossier, "data"), 0o700)
         shutil.copyfile(conf, os.path.join(dossier, "config.toml"))
@@ -241,14 +241,14 @@ def config_isolee(source=None):
         os.chmod(os.path.join(dossier, "config.toml"), 0o600)
         os.chmod(os.path.join(dossier, ".secret_key"), 0o600)
     except OSError as exc:
-        log("config isolée impossible : %s" % exc)
+        log("isolated config impossible: %s" % exc)
         shutil.rmtree(dossier, ignore_errors=True)
         return None
     return dossier
 
 
 def binaire_zeroclaw():
-    """Chemin de `zeroclaw` : PATH, puis les emplacements connus des runners."""
+    """Path to `zeroclaw`: PATH, then known runner locations."""
     candidats = [shutil.which("zeroclaw")] + [
         os.path.join(maison, ".cargo", "bin", "zeroclaw")
         for maison in (os.path.expanduser("~"), "/home/gaia")]
@@ -260,12 +260,12 @@ def binaire_zeroclaw():
 
 
 def _umask_prive():
-    """Umask 077 dans le processus fils (état ZeroClaw non partagé)."""
+    """Umask 077 in the child process (unshared ZeroClaw state)."""
     os.umask(0o077)
 
 
 def lancer_agent(prompt, dossier, budget=BUDGET_S):
-    """Lance `zeroclaw agent --agent fw -m <prompt>`. Rend (ok, sortie)."""
+    """Launches `zeroclaw agent --agent fw -m <prompt>`. Returns (ok, output)."""
     binaire = binaire_zeroclaw()
     if binaire is None:
         return False, INFRA + ("zeroclaw introuvable sur ce runner (PATH, "
@@ -273,16 +273,16 @@ def lancer_agent(prompt, dossier, budget=BUDGET_S):
                                "/usr/local/bin)")
     conf = config_isolee()
     if conf is None:
-        return False, INFRA + "config ZeroClaw absente (config.toml + .secret_key)"
+        return False, INFRA + "ZeroClaw config missing (config.toml + .secret_key)"
     try:
         proc = subprocess.run([binaire, "--config-dir", conf, "agent",
                                "--agent", "fw", "-m", prompt],
                               capture_output=True, text=True, timeout=budget,
                               cwd=dossier, preexec_fn=_umask_prive)
     except subprocess.TimeoutExpired:
-        return False, "budget de %d s dépassé" % budget
+        return False, "budget of %d s exceeded" % budget
     except (OSError, subprocess.SubprocessError) as exc:
-        return False, "lancement impossible : %s" % exc
+        return False, "launch impossible: %s" % exc
     finally:
         shutil.rmtree(conf, ignore_errors=True)
     sortie = ((proc.stdout or "") + "\n" + (proc.stderr or "")).strip()
@@ -290,12 +290,12 @@ def lancer_agent(prompt, dossier, budget=BUDGET_S):
 
 
 def sortie_outil(chemin):
-    """Vrai pour un répertoire de sortie d'outil (Gradle, IDE)."""
+    """True for a tool output directory (Gradle, IDE)."""
     return chemin.startswith(JAMAIS_COMMITES) or "/build/" in chemin
 
 
 def changements():
-    """Fichiers modifiés ou ajoutés dans le clone (hors suivis ignorés)."""
+    """Files modified or added in the clone (excluding ignored tracked files)."""
     proc = subprocess.run(["git", "status", "--porcelain"], capture_output=True,
                           text=True, timeout=120)
     if proc.returncode != 0:
@@ -312,7 +312,7 @@ def changements():
 
 
 def diff_lines():
-    """Lignes ajoutées + supprimées du diff de travail (0 si illisible)."""
+    """Added + removed lines of the working diff (0 if unreadable)."""
     proc = subprocess.run(["git", "diff", "--numstat", "HEAD"],
                           capture_output=True, text=True, timeout=120)
     total = 0
@@ -324,43 +324,43 @@ def diff_lines():
 
 
 def est_un_test(chemin):
-    """Vrai pour un fichier de test (Kotlin, JVM)."""
+    """True for a test file (Kotlin, JVM)."""
     return "/src/test/" in chemin or chemin.endswith("Test.kt")
 
 
 def verifier_diff(fichiers):
-    """(ok, raison) : refus des gardes, du volume et du test affaibli."""
+    """(ok, reason): refusal of guards, volume and weakened test."""
     refuses = [f for f in fichiers if f.startswith(REFUSES)]
     if refuses:
-        return False, "touche un fichier de garde (%s)" % ", ".join(refuses[:3])
-    # Un agent qui « corrige » en réécrivant le test ne prouve rien : il faut
-    # au moins un fichier de production dans le correctif.
+        return False, "touches a guard file (%s)" % ", ".join(refuses[:3])
+    # An agent that 'fixes' by rewriting the test proves nothing: the fix must
+    # include at least one production file.
     if fichiers and all(est_un_test(f) for f in fichiers):
-        return False, ("ne touche que des tests — un test réécrit ne prouve "
-                       "rien, correctif refusé")
+        return False, ("only touches tests — a rewritten test proves "
+                       "nothing, fix refused")
     if len(fichiers) > MAX_FICHIERS:
-        return False, "%d fichiers (plafond %d)" % (len(fichiers), MAX_FICHIERS)
+        return False, "%d files (cap %d)" % (len(fichiers), MAX_FICHIERS)
     lignes = diff_lines()
     if lignes > MAX_LIGNES:
-        return False, "%d lignes modifiées (plafond %d)" % (lignes, MAX_LIGNES)
+        return False, "%d lines changed (cap %d)" % (lignes, MAX_LIGNES)
     return True, ""
 
 
 def commiter(pr):
-    """Commit d'identité propriétaire (règle du dépôt), sorties d'outils exclues."""
+    """Owner-identity commit (repository rule), tool outputs excluded."""
     subprocess.run(["git", "add", "-A"] + list(EXCLUSIONS_GIT),
                    capture_output=True, text=True, timeout=120)
     proc = subprocess.run(
         ["git", "-c", "user.name=GaiaSG94",
-         "-c", "user.email=gsg.corbeille@outlook.fr",
+         "-c", "user.email=290536685+GaiaSG94@users.noreply.github.com",
          "commit", "-q", "-m",
-         "fix(isee): correctif CI proposé par l'agent fw (PR #%s)" % pr],
+         "fix(isee): CI fix proposed by the fw agent (PR #%s)" % pr],
         capture_output=True, text=True, timeout=120)
     return proc.returncode == 0, (proc.stderr or "").strip()[:200]
 
 
 def pousser(repo, branch, sha):
-    """Push avec bail : jamais d'écrasement d'un push arrivé entre-temps."""
+    """Push with lease: never overwrite a push that arrived in the meantime."""
     url = ("https://x-access-token:%s@github.com/%s.git"
            % (jeton_ecriture(), repo)) if jeton_ecriture() else "origin"
     proc = subprocess.run(["git", "push", "--force-with-lease=%s:%s"
@@ -370,7 +370,7 @@ def pousser(repo, branch, sha):
 
 
 def preparer_clone(repo, pr):
-    """Récupère la tête de la PR et s'y place. Rend (ok, message)."""
+    """Fetches the PR head and checks it out. Returns (ok, message)."""
     url = ("https://x-access-token:%s@github.com/%s.git"
            % (jeton_ecriture(), repo)) if jeton_ecriture() else "origin"
     try:
@@ -383,102 +383,102 @@ def preparer_clone(repo, pr):
 
 
 def preflight(repo, pr, sha):
-    """(runs en échec, extrait du journal), ou None si rien à faire."""
+    """(failed runs, log excerpt), or None if nothing to do."""
     if os.environ.get("TEST_AGENT", "1") == "0":
-        log("désactivé (TEST_AGENT=0)")
+        log("disabled (TEST_AGENT=0)")
         return None
     presents = set(labels(repo, pr))
     evites = presents & {"hold", LABEL_HUMAN}
     if evites:
-        log("labels %s : main humaine" % ",".join(sorted(evites)))
+        log("labels %s: human hand" % ",".join(sorted(evites)))
         return None
     if marque_presente(repo, pr, MARK % sha):
-        log("déjà tenté pour cette tête")
+        log("already tried for this head")
         return None
     runs = runs_en_echec(repo, sha)
     if not runs:
-        log("aucun run en échec sur %s" % sha[:7])
+        log("no failed run on %s" % sha[:7])
         return None
     return runs, extrait_journal(runs)
 
 
 def lancer_sur_clone(repo, pr, extrait, indice=""):
-    """Fait travailler l'agent fw dans le clone (rend fichiers, sortie)."""
+    """Has the fw agent work in the clone (returns files, output)."""
     prompt = prompt_fix(repo, pr, os.getcwd(), extrait, indice=indice)
-    log("agent fw lancé (%d lignes de journal)" % extrait.count("\n"))
+    log("fw agent launched (%d log lines)" % extrait.count("\n"))
     debut = time.time()
     ok, sortie = lancer_agent(prompt, os.getcwd())
-    log("agent rendu en %d s (ok=%s)" % (time.time() - debut, ok))
+    log("agent returned in %d s (ok=%s)" % (time.time() - debut, ok))
     if not ok and sortie.startswith(INFRA):
-        # Runner non provisionné : rien n'a été tenté, rien ne doit être marqué.
+        # Unprovisioned runner: nothing was attempted, nothing must be marked.
         return None, sortie[len(INFRA):]
     return changements(), sortie
 
 
 def refuser(repo, pr, marque, detail, raison):
-    """Refus motivé : rien n'est poussé, la main humaine est nommée."""
-    comment(repo, pr, "%s\n\nCorrectif **refusé** : %s.\n\n%s"
+    """Justified refusal: nothing is pushed, the human hand is named."""
+    comment(repo, pr, "%s\n\nFix **refused**: %s.\n\n%s"
             % (marque, raison, detail))
     add_label(repo, pr, LABEL_HUMAN)
     return 1
 
 
 def livrer(repo, pr, args, fichiers, sortie):
-    """Garde-fous, compilation, commit, push. Rend 0 ou 1."""
+    """Safeguards, compilation, commit, push. Returns 0 or 1."""
     marque = MARK % args.sha
     if not fichiers:
-        comment(repo, pr, "%s\n\nL'agent **n'a proposé aucun changement**"
-                " (%s). La main humaine reste nécessaire.\n\n```\n%s\n```"
-                % (marque, "échec de l'agent" if not sortie else "ABANDON",
+        comment(repo, pr, "%s\n\nThe agent **proposed no change**"
+                " (%s). The human hand is still needed.\n\n```\n%s\n```"
+                % (marque, "agent failure" if not sortie else "ABANDON",
                    (sortie or "")[-800:]))
         add_label(repo, pr, LABEL_HUMAN)
         return 2
     valide, raison = verifier_diff(fichiers)
     if not valide:
-        return refuser(repo, pr, marque, "La branche reste intacte.", raison)
+        return refuser(repo, pr, marque, "The branch stays intact.", raison)
     if compilation_gate is not None:
-        # La porte juge les fichiers que l'agent a VRAIMENT touchés, pas le
-        # diff PR/main (un test jamais modifié par la PR y est invisible).
+        # The gate judges the files the agent REALLY touched, not the
+        # PR/main diff (a test never modified by the PR is invisible there).
         ok, detail = compilation_gate.verifier_compilation(fichiers)
         if not ok:
-            return refuser(repo, pr, marque, detail, "il ne compile pas")
+            return refuser(repo, pr, marque, detail, "it does not compile")
     commit_ok, erreur = commiter(pr)
     if not commit_ok:
         return refuser(repo, pr, marque, erreur, "commit impossible")
     pousse, erreur = pousser(repo, args.branch, args.sha)
     if not pousse:
-        return refuser(repo, pr, marque, erreur, "push refusé (bail)")
+        return refuser(repo, pr, marque, erreur, "push refused (lease)")
     liste = ", ".join("`%s`" % f for f in sorted(fichiers)[:10])
-    comment(repo, pr, "%s\n\nCorrectif proposé et poussé sur `%s` : %s.\n\n"
-            "Compilation vérifiée avant le push ; la CI rejuge le comportement."
+    comment(repo, pr, "%s\n\nFix proposed and pushed to `%s`: %s.\n\n"
+            "Compilation checked before push; CI re-judges behaviour."
             % (marque, args.branch, liste))
     add_label(repo, pr, LABEL_OK)
-    log("correctif poussé (%d fichiers)" % len(fichiers))
+    log("fix pushed (%d files)" % len(fichiers))
     return 0
 
 
 def cmd_fix(args):
-    """Pilote : préflight, agent dans le clone, puis livraison gardée."""
+    """Driver: preflight, agent in the clone, then guarded delivery."""
     pre = preflight(args.repo, args.pr, args.sha)
     if pre is None:
         return 2
     runs, extrait = pre
     ok, message = preparer_clone(args.repo, args.pr)
     if not ok:
-        comment(args.repo, args.pr, "Clone de la PR impossible : %s." % message)
+        comment(args.repo, args.pr, "PR clone impossible: %s." % message)
         return 1
-    indice = ""  # triage : jamais d'exception, il ne fait qu'aider
+    indice = ""  # triage: never raises, it only helps
     if isinstance(args.indice, str) and args.indice:
         try:
             with open(args.indice, encoding="utf-8", errors="replace") as f:
                 indice = f.read()[:4000]
-        except OSError:  # indice disparu : l'agent travaille sans, comme avant
+        except OSError:  # index gone: the agent works without it, as before
             pass
     fichiers, sortie = lancer_sur_clone(args.repo, args.pr, extrait, indice)
     if fichiers is None:
-        # Outillage absent : aucune marque, aucun commentaire (le balayeur le dit
-        # dans son journal), l'unique tentative de la tête reste ouverte.
-        log("outillage absent, rien tenté : %s" % sortie)
+        # Tooling absent: no marker, no comment (the sweeper says so in its log),
+        # the head's only attempt stays open.
+        log("tooling absent, nothing attempted: %s" % sortie)
         return 3
     return livrer(args.repo, args.pr, args, fichiers, sortie)
 

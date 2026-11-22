@@ -1,12 +1,12 @@
 /**
- * Taxonomie fermée des erreurs (maths) — décision structurante du projet.
+ * Closed taxonomy of (maths) errors — a defining decision of the project.
  *
- * Le modèle n'invente jamais de catégorie : il doit choisir parmi ces 12 codes,
- * ou répondre E99 (« non typée ») qui est exclue du profil. C'est ce verrou qui
- * rend le diagnostic mesurable et défendable (cf. RATURE.md §17).
+ * The model never invents a category: it must choose from these 12 codes, or
+ * answer E99 ("untyped"), which is excluded from the profile. This lock is what
+ * makes the diagnosis measurable and defensible (see REVISION.md §17).
  *
- * Libellés et signatures en anglais : le produit est en anglais, et les
- * signatures servent de garde-fou dans les prompts (le modèle répond en anglais).
+ * Labels and signatures are in English: the product is in English, and the
+ * signatures act as a safeguard in the prompts (the model answers in English).
  */
 
 export const CODES_ERREUR = [
@@ -24,13 +24,13 @@ export const CODES_ERREUR = [
   'E12',
 ] as const
 
-/** E99 = aucune catégorie avec confiance suffisante : signalée, hors profil. */
+/** E99 = no category with sufficient confidence: reported, outside the profile. */
 export type CodeErreur = (typeof CODES_ERREUR)[number] | 'E99'
 
 export type TypeErreur = {
   code: (typeof CODES_ERREUR)[number]
   libelle: string
-  /** Signature à rechercher — sert de garde-fou dans les prompts. */
+  /** Signature to look for — acts as a safeguard in the prompts. */
   signature: string
 }
 
@@ -121,7 +121,7 @@ export function signatureDe(code: CodeErreur): string {
   return PAR_CODE.get(code)?.signature ?? ''
 }
 
-/** E99 sort du profil ; E11 y entre avec un poids nul (ce n'est pas une lacune). */
+/** E99 leaves the profile; E11 enters it with zero weight (it is not a gap). */
 export function entreDansLeProfil(code: CodeErreur): boolean {
   return code !== CODE_NON_TYPEE
 }

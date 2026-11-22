@@ -32,14 +32,14 @@ function erreur(partial: Partial<Erreur> & { code: Erreur['code'] }): Erreur {
   }
 }
 
-describe('analyse fusionnée (lot 1)', () => {
-  it('le prompt embarque la taxonomie complète, sans marqueur résiduel', () => {
+describe('merged analysis (batch 1)', () => {
+  it('the prompt carries the full taxonomy, with no leftover marker', () => {
     expect(PROMPT_ANALYSE).toContain('E12')
     expect(PROMPT_ANALYSE).not.toContain('{{TAXONOMIE}}')
     expect(messageAnalyse().length).toBeGreaterThan(20)
   })
 
-  it('copie propre : aucune faute, même si le modèle en propose', () => {
+  it('clean paper: no error, even if the model proposes some', () => {
     const { extraction, erreurs } = analyserTexte({
       annotations: [{ ligne: 'a', annotation: 'faux', code: 'E01', confiance: 0.9, explication: 'x' }],
       copiePropre: true,
@@ -48,13 +48,13 @@ describe('analyse fusionnée (lot 1)', () => {
     expect(erreurs).toHaveLength(0)
   })
 
-  it('sans annotation, la copie est propre', () => {
+  it('with no annotation, the paper is clean', () => {
     const { extraction, erreurs } = analyserTexte({ annotations: [], copiePropre: false })
     expect(extraction.copiePropre).toBe(true)
     expect(erreurs).toHaveLength(0)
   })
 
-  it('les règles locales s’appliquent : seuil, code inconnu, E11', () => {
+  it('local rules apply: threshold, unknown code, E11', () => {
     const { erreurs } = decouperAnalyse({
       annotations: [
         { ligne: 'a', annotation: 'signe !', code: 'E01', confiance: 0.9, explication: 'x' },
@@ -68,7 +68,7 @@ describe('analyse fusionnée (lot 1)', () => {
     expect(erreurs[3]!.ponderee).toBe(false)
   })
 
-  it('l’extraction conserve les champs utiles au diagnostic affiché', () => {
+  it('extraction keeps the fields useful for the displayed diagnosis', () => {
     const { extraction } = decouperAnalyse({
       annotations: [
         {
@@ -90,15 +90,15 @@ describe('analyse fusionnée (lot 1)', () => {
   })
 })
 
-describe('seconde passe sur les fautes peu sûres (lot 3)', () => {
-  it('le seuil de revue exclut E99 et les confiances nulles', () => {
+describe('second pass on uncertain errors (batch 3)', () => {
+  it('the review threshold excludes E99 and zero confidences', () => {
     expect(aRevoir(erreur({ code: 'E01', confiance: SEUIL_REVUE - 0.01 }))).toBe(true)
     expect(aRevoir(erreur({ code: 'E01', confiance: SEUIL_REVUE }))).toBe(false)
     expect(aRevoir(erreur({ code: 'E99', confiance: 0.5 }))).toBe(false)
     expect(aRevoir(erreur({ code: 'E01', confiance: 0 }))).toBe(false)
   })
 
-  it('on ne reverra que les moins sûres, dans la limite fixée', () => {
+  it('only the least certain ones are reviewed, within the set limit', () => {
     const erreurs = Array.from({ length: MAX_FAUTES_A_REVOIR + 3 }, (_, i) =>
       erreur({ code: 'E01', confiance: 0.3 + i * 0.05 }),
     )
@@ -108,11 +108,11 @@ describe('seconde passe sur les fautes peu sûres (lot 3)', () => {
     expect(erreurs[indices[0]!]!.confiance).toBeLessThan(erreurs[indices[1]!]!.confiance)
   })
 
-  it('confirmer, reclasser, rétrograder — et rien d’autre ne bouge', () => {
+  it('confirm, reclassify, downgrade — and nothing else changes', () => {
     const erreurs = [
       erreur({ code: 'E01', confiance: 0.95 }), // hors revue : intouchable
-      erreur({ code: 'E04', confiance: 0.6 }), // revue : reclasse en E01
-      erreur({ code: 'E12', confiance: 0.5 }), // revue : rétrograde en E99
+      erreur({ code: 'E04', confiance: 0.6 }), // review: reclassify to E01
+      erreur({ code: 'E12', confiance: 0.5 }), // review: downgrade to E99
     ]
     const indices = indicesASurveiller(erreurs)
     expect(indices).toEqual([2, 1])
@@ -128,13 +128,13 @@ describe('seconde passe sur les fautes peu sûres (lot 3)', () => {
     expect(modifiees).toBe(2)
   })
 
-  it('aucune faute douteuse : aucun appel au modèle', async () => {
+  it('no doubtful error: no model call', async () => {
     const resultat = await revoirFautesPeuSures([erreur({ code: 'E01', confiance: 0.95 })], transport, clientSimule([]))
     expect(resultat.revues).toBe(0)
     expect(resultat.erreurs).toHaveLength(1)
   })
 
-  it('une faute douteuse : un appel, verdict appliqué', async () => {
+  it('one doubtful error: one call, verdict applied', async () => {
     const reponse = JSON.stringify({
       fautes: [{ index: 0, code: 'E99', confiance: 0.3, explication: 'Trop ambigu pour trancher.', decision: 'retrograde' }],
     })
@@ -145,7 +145,7 @@ describe('seconde passe sur les fautes peu sûres (lot 3)', () => {
     )
     expect(resultat.revues).toBe(1)
     expect(resultat.erreurs[0]!.code).toBe('E99')
-    expect(messageRevue([erreur({ code: 'E05', confiance: 0.62 })], [0])).toContain('code proposé : E05')
+    expect(messageRevue([erreur({ code: 'E05', confiance: 0.62 })], [0])).toContain('proposed code: E05')
     expect(PROMPT_REVUE).toContain('E12')
   })
 })

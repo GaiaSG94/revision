@@ -1,12 +1,12 @@
 /**
- * Adresses publiques du projet. Un seul endroit : les sections qui pointent vers
- * le dépôt ou la démo en découlent, aucune URL n'est recopiée.
+ * Public addresses of the project. A single place: sections pointing to the
+ * repository or the demo derive from it, no URL is copied.
  */
-export const DEPOT = 'https://github.com/GaiaSG94/errata'
+export const DEPOT = 'https://github.com/GaiaSG94/revision'
 
-export const DEMO = 'https://gaiasg94.github.io/rature/'
+export const DEMO = 'https://gaiasg94.github.io/revision/'
 
-/** Lien GitHub vers un fichier du dépôt, sur la branche principale. */
+/** GitHub link to a file in the repository, on the main branch. */
 export function docDuDepot(chemin: string): string {
   return `${DEPOT}/blob/main/${chemin}`
 }

@@ -4,11 +4,11 @@ import type { Reglages as ReglagesType } from '../../domain/types'
 import { Bouton } from '../components/Bouton'
 import { PanneauSante } from '../components/PanneauSante'
 import { Carte } from '../components/Carte'
-import { useRature } from '../../etat/useRature'
+import { useRature } from '../../etat/useRevision'
 
 const CHAMP = 'w-full rounded-lg border border-bord bg-surface-2 p-3 text-texte'
 
-/** Écran 8 : BYOK, modèle, proxy, confidentialité, export et suppression. */
+/** Screen 8: BYOK, model, proxy, privacy, export and deletion. */
 export function Reglages() {
   const { reglages, enregistrerReglages, viderHistorique, diagnostics } = useRature()
   const [brouillon, setBrouillon] = useState<ReglagesType>(reglages)

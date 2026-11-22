@@ -1,35 +1,32 @@
-# Errata 🖊️
+# Revision 🖊️
 
-> Photograph your corrected math paper. Errata finds the mistake you keep repeating — and builds
+> Photograph your corrected math paper. Revision finds the mistake you keep repeating — and builds
 > the exercise that works exactly on it.
 
-[![Live demo](https://img.shields.io/badge/demo-live-f2a516?style=flat-square)](https://gaiasg94.github.io/errata/)
-[![CI](https://img.shields.io/github/actions/workflow/status/GaiaSG94/errata/ci.yml?branch=main&label=ci&style=flat-square)](https://github.com/GaiaSG94/errata/actions/workflows/ci.yml)
-[![Tests](https://img.shields.io/badge/tests-206%20passing-43d18c?style=flat-square)](tests)
+[![Demo guide](https://img.shields.io/badge/demo-offline-f2a516?style=flat-square)](DEMO.md)
+[![CI](https://img.shields.io/github/actions/workflow/status/GaiaSG94/revision/ci.yml?branch=main&label=ci&style=flat-square)](https://github.com/GaiaSG94/revision/actions/workflows/ci.yml)
+[![Tests](https://img.shields.io/badge/tests-offline%20suite-43d18c?style=flat-square)](tests)
 [![MIT licence](https://img.shields.io/badge/licence-MIT-9aa3b2?style=flat-square)](LICENSE)
-
-Submitted to **IceHacks 2026** (CodeStarters, Devpost).
 
 ## Try it now
 
-**<https://gaiasg94.github.io/errata/>** — public, HTTPS, no account, nothing to install.
+**No live URL is claimed for this rebranded submission.** At the time of writing the configured
+Pages URL did not serve a deployment. The dependable, key-free and network-free demonstration is
+the local offline demo — see [`DEMO.md`](DEMO.md).
 
 | You want to… | Do this |
 |---|---|
 | See the product in seconds, without sending anything | Home → **Try a sample paper** (papers written for this demo, real model answers recorded and replayed offline) |
 | Watch the whole story | Home → **Watch the demo** (one student, four papers, profile and trajectory) |
-| Analyse **your own** corrected paper | Home → **Photograph my paper**: the analysis goes through our proxy, no key needed |
+| Analyse **your own** corrected paper | Home → **Photograph my paper**: when an edge proxy is deployed, the analysis goes through it and no key is needed; otherwise use BYOK or the offline demo |
 | Analyse without depending on the shared proxy | Settings (⚙) → paste your own InferHub key (BYOK); it stays on your device |
 | Check that no image is kept | Open the Network tab: the image travels as base64 in the request, nothing is written, history lives in IndexedDB |
 
-The public proxy is a **Cloudflare Worker** (`worker/worker.js`: server-side model fallback chain,
-quota, 60 s circuit breaker): <https://errata-proxy.rature.workers.dev/analyze> (the subdomain keeps
-the project's original working name). Its URL is injected at build time through the repository
-variable `RATURE_PROXY_URL`. A Modal variant (CPU, scale-to-zero) remains in `proxy/modal_app.py`.
-
-> **Honest status, Nov 15:** the upstream vision models (InferHub marketplace) are intermittently
-> returning `503 no available provider`. When that happens, live analysis shows a clear error with
-> **Try again**, and the sample papers still work offline with answers recorded on the real model.
+The live path uses a **Cloudflare Worker** edge proxy (`worker/worker.js`: server-side model
+fallback chain, quota, 60 s circuit breaker). Its URL is injected at build time through the
+repository variable `REVISION_PROXY_URL`. A Modal variant (CPU, scale-to-zero) remains in
+`proxy/modal_app.py`. The proxy's current deployment status must be verified before relying on the
+live path; the offline demo in [`DEMO.md`](DEMO.md) needs neither.
 
 ---
 
@@ -45,7 +42,7 @@ answer: **the marked paper**.
 
 ## The idea
 
-You don't photograph the exercise, you photograph **the correction**. Errata is not an exercise
+You don't photograph the exercise, you photograph **the correction**. Revision is not an exercise
 generator: it is a **personal error profile** that sharpens with every paper.
 
 - 1st paper → a diagnosis
@@ -58,7 +55,7 @@ generator: it is a **personal error profile** that sharpens with every paper.
  photo ──▶ 1 Ingest ──▶ 2 Anonymise ──▶ 3 Read ──▶ 4 Classify ──▶ 5 Aggregate ──▶ 6 Generate
            normalise     mask the name    teacher's   type each       local profile   targeted drill
            + contrast                     marks       mistake         (IndexedDB)     + relevance
-                                                      (E01..E12/E99)                  guard
+                                                      (E01..E12/E99)                   guard
 ```
 
 | Step | Input | Output | Budget |
@@ -138,7 +135,7 @@ Narrowing the scope is a design decision, not an admission.
   end up as `E99`.
 - **Off-topic exercises:** without a second pass, generation drifts to the general topic
   (fractions) instead of the faulty gesture (the common denominator). Hence the guard.
-- **Silent hangs when the upstream is saturated:** on Nov 15 the whole vision chain answered 503 and
+- **Silent hangs when the upstream is saturated:** the whole vision chain once answered 503 and
   the analysis screen waited forever. Fix: a global time budget, progress messages naming the model
   being tried, and an honest error with **Try again**.
 
@@ -161,8 +158,8 @@ The product speaks an OpenAI-compatible API served by **InferHub**. Three modes,
 1. **Edge proxy** (recommended): the `INFERHUB_API_KEY` stays server-side.
    - Cloudflare Worker: `worker/worker.js` (`wrangler deploy`, `wrangler secret put INFERHUB_API_KEY`);
    - Vercel: `vercel.json` + `api/analyze.ts`.
-2. **BYOK**: the user pastes their key in Settings; it is sent in the `x-rature-cle` header and stays
-   on the device. Safety net if the proxy quota runs out during judging.
+2. **BYOK**: the user pastes their key in Settings; it is sent in the `x-revision-cle` header and stays
+   on the device. Safety net if the proxy quota runs out.
 3. **Offline demo**: the **Try a sample paper** screen and **Watch the demo** replay the full path
    on papers written for this demo — four tests from the same student (Jordan), rendered as real
    photos (page tilted on a desk, uneven light, teacher's red pen), plus two other students. They
@@ -184,7 +181,7 @@ Variables: see [`.env.example`](.env.example).
 | RNF-05 | mobile (direct photo) | required | `capture="environment"`, targets ≥ 48 px |
 | RNF-06 | accessibility AA, keyboard, ≥ 16 px | required | visible focus, `aria-live`, text ≥ 16 px |
 | RNF-07 | initial bundle | < 300 KB gzip | ~127 KB gzip JS + 8 KB CSS |
-| RNF-08 | availability during judging | 24/7 | GitHub Pages (static, no backend) |
+| RNF-08 | availability | 24/7 | GitHub Pages workflow configured (static, no backend); verify current deployment — see [`DEMO.md`](DEMO.md) |
 | RNF-09 | quota exhausted → clear message + BYOK | required | plain-English message, BYOK field |
 | RNF-10 | no paid dependency | required | $0 |
 
@@ -192,7 +189,8 @@ Variables: see [`.env.example`](.env.example).
 
 No image is persisted, neither on the client nor on the proxy. The name is masked before any
 display. The proxy only logs the timestamp, the HTTP status and the latency. Local history can be
-exported and deleted in one click, and the UI says so.
+exported and deleted in one click, and the UI says so. Credential handling and the full privacy
+design are documented in [`SECURITY.md`](SECURITY.md).
 
 ## CI and infrastructure
 
@@ -200,10 +198,30 @@ CI in under 5 minutes on GitHub-hosted runners (`ubuntu-latest`); three required
 `ci-budget`, `couche0`); merges through the Mergify queue; GitHub Pages deploys on every push to
 `main`. Details: [`docs/INFRA-CI.md`](docs/INFRA-CI.md).
 
-## AI tools declaration
-
-Required and owned: [`docs/DECLARATION-IA.md`](docs/DECLARATION-IA.md).
-
 ## Licence
 
-MIT — see [`LICENSE`](LICENSE).
+MIT — see [`LICENSE`](LICENSE). External libraries and corpus assets are credited in
+[`CREDITS.md`](CREDITS.md); AI-assisted work is declared in
+[`docs/AI-DISCLOSURE.md`](docs/AI-DISCLOSURE.md).
+
+## Provenance
+
+This project is a rebrand of an existing codebase. Work completed during the event is separated
+from pre-existing code, templates and assets in [`PROVENANCE.md`](PROVENANCE.md), with dates
+verifiable from the preserved Git history (`git log`).
+
+## Submission compliance
+
+- **Deadline:** the submitter must submit before the published deadline; this repository does not
+  claim that submission has already happened.
+- **Distinguish event work:** pre-existing code and assets are identified in
+  [`PROVENANCE.md`](PROVENANCE.md).
+- **Credit sources:** libraries, datasets/assets and AI-assisted tools are listed in
+  [`CREDITS.md`](CREDITS.md).
+- **Permission to use materials:** the corpus is synthetic and generated in-repository; font
+  licences and design-mockup permission are marked "to be confirmed by the submitter" in
+  [`CREDITS.md`](CREDITS.md).
+- **No exposed secrets:** no credentials are committed; environment-variable names and handling
+  rules are in [`SECURITY.md`](SECURITY.md).
+- **Accessible demonstration:** setup and the key-free offline demo are explained in
+  [`DEMO.md`](DEMO.md); no undeployed live URL is advertised.

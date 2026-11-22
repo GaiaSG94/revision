@@ -1,11 +1,11 @@
 /**
- * Contenu pédagogique par type d'erreur — lot 4.
+ * Teaching content by error type — batch 4.
  *
- * Statique, zéro appel API : chaque type reçoit une explication courte, le
- * geste concret qui l'évite, un mini-exemple faux et sa version juste, et le
- * piège voisin qui lui ressemble. C'est ce qui transforme un diagnostic en
- * apprentissage — l'argument pédagogique du projet. Ton bienveillant, jamais
- * culpabilisant. Contenu en anglais (le produit est en anglais).
+ * Static, zero API calls: each type gets a short explanation, the concrete move
+ * that avoids it, a wrong mini-example and its correct version, and the
+ * neighbouring trap it resembles. This is what turns a diagnosis into learning
+ * — the project's pedagogical argument. Caring tone, never blameful. Content
+ * in English (the product is in English).
  */
 import { CODES_ERREUR, libelleDe } from './taxonomy'
 import type { CodeErreur } from './taxonomy'

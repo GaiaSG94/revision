@@ -3,11 +3,11 @@ import { origineExercice } from '../../domain/banque'
 import { libelleDe } from '../../domain/taxonomy'
 import { Bouton } from '../components/Bouton'
 import { Carte } from '../components/Carte'
-import { useRature } from '../../etat/useRature'
+import { useRature } from '../../etat/useRevision'
 
 /**
- * Écran 6 : l'exercice ciblé. La solution est masquée par défaut — l'app
- * entraîne, elle ne donne jamais la réponse (§10).
+ * Screen 6: the targeted exercise. The solution is hidden by default — the app
+ * trains, it never gives the answer (§10).
  */
 export function Exercice() {
   const { resultat, nouvelExercice, occupe, aller } = useRature()

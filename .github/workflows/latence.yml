@@ -1,20 +1,20 @@
 name: latence
 
-# Relevé horaire de la latence et de la disponibilité de l'amont (idée 10 du
-# brassage « rester sur InferHub »).
+# Hourly reading of upstream latency and availability (idea 10 of the
+# "staying on InferHub" brainstorm).
 #
-# Trois usages : choisir l'heure du tournage de la vidéo sur des données plutôt
-# qu'à l'intuition, prouver la disponibilité pendant le jugement (RNF-08), et
-# documenter honnêtement la contrainte d'un amont qui est une place de marché.
+# Three uses: choose the video filming time from data rather than
+# intuition, prove availability during judging (RNF-08), and honestly
+# document the constraint of an upstream that is a marketplace.
 #
-# Le relevé est publié sur la branche `donnees/latence` : `main` est protégé par
-# un ruleset (PR obligatoire), un push automatique y serait refusé.
+# The reading is published on the `donnees/latence` branch: `main` is
+# protected by a ruleset (PR required), an automatic push would be refused.
 #
-# Le job ne doit JAMAIS être rouge : un relevé raté ne doit pas déclencher
-# d'alerte ni casser quoi que ce soit.
+# The job must NEVER be red: a failed reading must not trigger
+# an alert nor break anything.
 on:
   schedule:
-    # Minute décalée des crons horaires usuels, pour éviter les rafales.
+    # Offset minute from usual hourly crons, to avoid bursts.
     - cron: '7 * * * *'
   workflow_dispatch: {}
 
@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   relever:
-    name: relever la latence de l'amont
+    name: Measure upstream latency
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -37,27 +37,27 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
 
-      - name: Sonde
+      - name: Probe
         shell: bash
         env:
           INFERHUB_API_KEY: ${{ secrets.INFERHUB_API_KEY }}
         run: |
           set -uo pipefail
-          node scripts/sonder-latence.mjs || echo "sonde ignorée"
+          node scripts/sonder-latence.mjs || echo "probe skipped"
 
-      - name: Publication sur la branche de données
+      - name: Publish to the data branch
         shell: bash
         env:
           PAT: ${{ secrets.AUTOMERGE_PAT }}
         run: |
           set -uo pipefail
-          [ -f docs/LATENCE.md ] || { echo "aucun relevé à publier"; exit 0; }
+          [ -f docs/LATENCE.md ] || { echo "no reading to publish"; exit 0; }
           git config user.name "GaiaSG94"
-          git config user.email "gsg.corbeille@outlook.fr"
+          git config user.email "290536685+GaiaSG94@users.noreply.github.com"
           BRANCHE="donnees/latence"
-          # On ne force JAMAIS : un commit par heure sur la branche de données,
-          # l'historique des relevés reste lisible. (Un push forcé serait
-          # refusé par le garde `couche0`.)
+          # We NEVER force: one commit per hour on the data branch,
+          # the readings history stays readable. (A forced push would be
+          # refused by the `couche0` guard.)
           cp docs/LATENCE.md /tmp/LATENCE.md 2>/dev/null || true
           git fetch origin "$BRANCHE" 2>/dev/null || true
           if git rev-parse --verify "origin/$BRANCHE" >/dev/null 2>&1; then
@@ -69,7 +69,7 @@ jobs:
           mkdir -p docs
           [ -f /tmp/LATENCE.md ] && cp /tmp/LATENCE.md docs/LATENCE.md
           git add -f docs/LATENCE.md || true
-          git commit -m "latence : relevé horaire $(date -u +%FT%TZ)" || echo "rien à publier"
+          git commit -m "latency: hourly reading $(date -u +%FT%TZ)" || echo "nothing to publish"
           git push "https://x-access-token:${PAT}@github.com/${{ github.repository }}.git" "$BRANCHE:$BRANCHE" \
-            || echo "publication impossible (la branche sera mise à jour au prochain passage)"
+            || echo "publishing failed (branch will be updated on next pass)"
           exit 0

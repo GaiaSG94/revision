@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""Garde-fou « budget CI » : tout job GitHub Actions doit être borné à 5 min.
+"""CI budget guard: every GitHub Actions job must be bounded to 5 min.
 
-Règle user 2026-10-24. Bibliothèque standard uniquement (les runners
-self-hosted n'ont pas PyYAML garanti). Analyse volontairement simple :
-on lit les workflows ligne à ligne, on repère la section `jobs:` et, pour
-chaque job (clé à 2 espaces), le `timeout-minutes:` à 4 espaces.
+User rule 2026-10-24. Standard library only (self-hosted runners are not
+guaranteed to have PyYAML). Deliberately simple analysis: we read the
+workflows line by line, locate the `jobs:` section and, for each job (key at
+2 spaces), the `timeout-minutes:` at 4 spaces.
 
-Erreurs (exit 1) : job sans `timeout-minutes`, ou timeout > MAX_MINUTES
-sur un workflow qui tourne sur pull_request. Les workflows hors PR (push sur
-la branche protégée, tags, déclenchement manuel) peuvent dépasser, avec un
-timeout explicite et un commentaire qui justifie le chiffre.
-Avertissements (exit 0) : `concurrency` absent, checkout sans fetch-depth: 1.
+Errors (exit 1): job without `timeout-minutes`, or timeout > MAX_MINUTES
+on a pull_request workflow. Non-PR workflows (push to the protected branch,
+tags, manual trigger) may exceed it, with an explicit timeout and a comment
+justifying the number.
+Warnings (exit 0): missing `concurrency`, checkout without fetch-depth: 1.
 """
 
 import glob
@@ -20,7 +20,7 @@ import sys
 
 MAX_MINUTES = 5
 WORKFLOWS = ".github/workflows"
-SKIP_FILES = set()  # le garde-fou se contrôle lui-même
+SKIP_FILES = set()  # the guard checks itself
 
 TOP_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*:")
 JOB_KEY = re.compile(r"^  ([A-Za-z0-9_.-]+):\s*(#.*)?$")
@@ -33,7 +33,7 @@ def read_lines(path):
 
 
 def scan_jobs(lines):
-    """Retourne [(nom, timeout|None)] pour la section jobs: du fichier."""
+    """Returns [(name, timeout|None)] for the file’s jobs: section."""
     jobs = []
     in_jobs = False
     for line in lines:
@@ -55,7 +55,7 @@ def scan_jobs(lines):
 
 
 def runs_on_pr(lines):
-    """Vrai si le workflow se déclenche sur pull_request (donc soumis au budget)."""
+    """True if the workflow triggers on pull_request (therefore subject to the budget)."""
     for line in lines:
         if line.startswith("jobs:"):
             break
@@ -70,23 +70,23 @@ def check_file(path, errors, warnings, display=None):
     lines = read_lines(path)
     jobs = scan_jobs(lines)
     if not jobs:
-        warnings.append("%s: aucun job détecté (workflow vide ?)" % rel)
+        warnings.append("%s: no job detected (empty workflow?)" % rel)
         return
     on_pr = runs_on_pr(lines)
     for name, timeout in jobs:
         if timeout is None:
             errors.append(
-                "%s: job '%s' sans timeout-minutes (défaut 360 min, interdit)"
+                "%s: job '%s' without timeout-minutes (default 360 min, forbidden)"
                 % (rel, name))
         elif timeout > MAX_MINUTES and on_pr:
             errors.append(
-                "%s: job '%s' timeout-minutes: %d > %d (budget CI)"
+                "%s: job '%s' timeout-minutes: %d > %d (CI budget)"
                 % (rel, name, timeout, MAX_MINUTES))
     if not any(line.startswith("concurrency:") for line in lines):
-        warnings.append("%s: pas de concurrency (annulation des runs obsolètes)"
+        warnings.append("%s: no concurrency (cancelling stale runs)"
                         % rel)
     if "actions/checkout" in "\n".join(lines) and "fetch-depth: 1" not in "\n".join(lines):
-        warnings.append("%s: checkout sans fetch-depth: 1" % rel)
+        warnings.append("%s: checkout without fetch-depth: 1" % rel)
 
 
 def main():
@@ -97,10 +97,10 @@ def main():
 
     errors, warnings = [], []
     if not paths:
-        print("::warning::Aucun workflow dans %s" % WORKFLOWS)
+        print("::warning::No workflow in %s" % WORKFLOWS)
     for path in paths:
-        # On lit le chemin réel (CI_BUDGET_ROOT peut viser ailleurs que le
-        # répertoire courant) mais on affiche le chemin relatif, stable.
+        # We read the real path (CI_BUDGET_ROOT may point elsewhere than the
+        # current directory) but display the stable relative path.
         check_file(path, errors, warnings,
                    display=os.path.relpath(path, root))
 
@@ -109,10 +109,10 @@ def main():
     for message in errors:
         print("::error::%s" % message)
 
-    print("%d workflow(s) contrôlé(s) : %d erreur(s), %d avertissement(s)"
+    print("%d workflow(s) checked: %d error(s), %d warning(s)"
           % (len(paths), len(errors), len(warnings)))
     if errors:
-        print("Règle : CI ≤ %d min par job — voir ~/Bureau/CI-BUDGET-5MIN.md"
+        print("Rule: CI ≤ %d min per job — see ~/Desktop/CI-BUDGET-5MIN.md"
               % MAX_MINUTES)
         return 1
     return 0

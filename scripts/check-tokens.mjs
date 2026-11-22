@@ -1,16 +1,15 @@
 #!/usr/bin/env node
 /**
- * Garde de taille (règle user d'octobre 2026) : fichiers < 500 lignes,
- * fonctions < 50 lignes. Un fichier qui grossit se découpe, il ne s'accepte pas.
+ * Size guard (user rule of October 2026): files < 500 lines,
+ * functions < 50 lines. A growing file is split up, never accepted as-is.
  *
- * Usage : node scripts/check-tokens.mjs [--strict]
- *   défaut  : échoue (exit 1) sur un fichier > 500 lignes ; les fonctions
- *             longues sont signalées en avertissement ;
- *   --strict: échoue aussi sur les fonctions > 50 lignes.
+ * Usage: node scripts/check-tokens.mjs [--strict]
+ *   default: fails (exit 1) on a file > 500 lines; long functions are
+ *            reported as warnings;
+ *   --strict: also fails on functions > 50 lines.
  *
- * Le comptage des fonctions est une heuristique par accolades (pas d'analyseur) :
- * les accolades écrites dans des chaînes faussent la mesure, d'où le mode
- * avertissement par défaut.
+ * Function counting is a brace heuristic (no parser): braces written inside
+ * strings skew the measurement, hence the default warning mode.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -69,20 +68,20 @@ for (const chemin of cibles) {
 }
 
 console.log(
-  `${cibles.length} fichier(s) contrôlé(s) — limite ${LIMITE_FICHIER} lignes/fichier, ${LIMITE_FONCTION} lignes/fonction`,
+  `${cibles.length} file(s) checked — limit ${LIMITE_FICHIER} lines/file, ${LIMITE_FONCTION} lines/function`,
 )
 for (const fichier of tropGros) {
-  console.log(`::error::${fichier.relatif} : ${fichier.taille} lignes (> ${LIMITE_FICHIER}) — à découper`)
+  console.log(`::error::${fichier.relatif}: ${fichier.taille} lines (> ${LIMITE_FICHIER}) — split it`)
 }
 for (const fonction of longues) {
   const marqueur = strict ? '::error::' : '::warning::'
-  console.log(`${marqueur}${fonction.relatif}:${fonction.ligne} function ${fonction.nom} : ${fonction.taille} lignes`)
+  console.log(`${marqueur}${fonction.relatif}:${fonction.ligne} function ${fonction.nom}: ${fonction.taille} lines`)
 }
 
 const echec = tropGros.length > 0 || (strict && longues.length > 0)
 console.log(
   echec
-    ? `REFUS : ${tropGros.length} fichier(s) et ${longues.length} fonction(s) hors limite`
-    : `OK : ${longues.length} fonction(s) signalée(s), aucun fichier hors limite`,
+    ? `FAILED: ${tropGros.length} file(s) and ${longues.length} function(s) over the limit`
+    : `OK: ${longues.length} function(s) flagged, no file over the limit`,
 )
 process.exit(echec ? 1 : 0)

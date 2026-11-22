@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests ciblés de test_agent.py — bibliothèque standard uniquement.
+"""Targeted tests for test_agent.py — standard library only.
 
 Lance : python3 .github/fireworks/test_test_agent.py
 """
@@ -13,7 +13,7 @@ import test_agent
 
 
 class PromptTest(unittest.TestCase):
-    """Le prompt porte les erreurs réelles, le dépôt et les règles."""
+    """The prompt carries the real errors, the repository and the rules."""
 
     def test_porte_extrait_et_regles(self):
         prompt = test_agent.prompt_fix("O/R", "12", "/tmp/clone",
@@ -22,12 +22,12 @@ class PromptTest(unittest.TestCase):
         self.assertIn("/tmp/clone", prompt)
         self.assertIn("FAILED FooTest > bar", prompt)
         self.assertIn(".github/", prompt)
-        self.assertIn("ne commit pas", prompt)
+        self.assertIn("do not commit", prompt)
         self.assertIn("ABANDON", prompt)
 
     def test_journal_absent_dit_indisponible(self):
         prompt = test_agent.prompt_fix("O/R", "12", "/tmp/c", "")
-        self.assertIn("indisponible", prompt)
+        self.assertIn("unavailable", prompt)
 
     def test_porte_verif_python_et_kotlin(self):
         prompt = test_agent.prompt_fix("O/R", "12", "/tmp/clone", "FAILED x")
@@ -35,13 +35,13 @@ class PromptTest(unittest.TestCase):
         self.assertIn("gradlew", prompt)
 
     def test_porte_le_triage_quand_il_existe(self):
-        """Le triage évite la recherche à l'aveugle (#919 : 2 abandons)."""
+        """Triage avoids blind searching (#919: 2 abandonments)."""
         prompt = test_agent.prompt_fix(
             "O/R", "12", "/tmp/clone", "FAILED x", "",
-            indice="- ProbeXTest hors périmètre\n- suspect : LiveProbePublish.kt")
-        self.assertIn("Triage automatique", prompt)
-        self.assertIn("ProbeXTest hors périmètre", prompt)
-        self.assertIn("suspect : LiveProbePublish.kt", prompt)
+            indice="- ProbeXTest out of scope\n- suspect: LiveProbePublish.kt")
+        self.assertIn("Automatic triage", prompt)
+        self.assertIn("ProbeXTest out of scope", prompt)
+        self.assertIn("suspect: LiveProbePublish.kt", prompt)
 
     def test_sans_triage_aucun_bloc_vide(self):
         prompt = test_agent.prompt_fix("O/R", "12", "/tmp/clone", "FAILED x")
@@ -49,7 +49,7 @@ class PromptTest(unittest.TestCase):
 
 
 class BinaireTest(unittest.TestCase):
-    """Localisation du binaire : PATH, puis les emplacements des runners."""
+    """Binary location: PATH, then runner locations."""
 
     def test_absent_partout(self):
         with mock.patch.object(test_agent.shutil, "which", return_value=None), \
@@ -68,12 +68,12 @@ class BinaireTest(unittest.TestCase):
 
 
 class DiffTest(unittest.TestCase):
-    """Le pilote refuse les gardes, le volume et le hors-cadre."""
+    """The driver refuses guards, volume and out-of-scope changes."""
 
     def test_garde_refusee(self):
         ok, raison = test_agent.verifier_diff([".github/workflows/ci.yml"])
         self.assertFalse(ok)
-        self.assertIn("garde", raison)
+        self.assertIn("guard", raison)
 
     def test_mergify_refuse(self):
         ok, _ = test_agent.verifier_diff([".mergify.yml"])
@@ -83,7 +83,7 @@ class DiffTest(unittest.TestCase):
         fichiers = ["core/f%d.kt" % i for i in range(test_agent.MAX_FICHIERS + 1)]
         ok, raison = test_agent.verifier_diff(fichiers)
         self.assertFalse(ok)
-        self.assertIn("plafond", raison)
+        self.assertIn("cap", raison)
 
     def test_diff_normal_accepte(self):
         with mock.patch.object(test_agent, "diff_lines", return_value=12):
@@ -108,7 +108,7 @@ class DiffTest(unittest.TestCase):
                                return_value=test_agent.MAX_LIGNES + 1):
             ok, raison = test_agent.verifier_diff(["core/a.kt"])
         self.assertFalse(ok)
-        self.assertIn("lignes", raison)
+        self.assertIn("lines", raison)
 
 
 class ChangementsTest(unittest.TestCase):
@@ -141,7 +141,7 @@ class ChangementsTest(unittest.TestCase):
 
 
 class JournalTest(unittest.TestCase):
-    """L'extrait garde les lignes de verdict, dont les tracebacks Python."""
+    """The excerpt keeps verdict lines, including Python tracebacks."""
 
     def test_garde_traceback_fichier_et_erreur(self):
         journal = "\n".join([
@@ -165,7 +165,7 @@ class JournalTest(unittest.TestCase):
 
 
 class RunsTest(unittest.TestCase):
-    """Les ids extraits sont des ids de run, pas de job (`/runs/<run>/job/<job>`)."""
+    """Extracted ids are run ids, not job ids (`/runs/<run>/job/<job>`)."""
 
     def test_prend_id_run(self):
         faux = mock.Mock(stdout="https://github.com/O/R/actions/runs/42701983653"
@@ -181,7 +181,7 @@ class RunsTest(unittest.TestCase):
 
 
 class FixTest(unittest.TestCase):
-    """Le pilote : borné, jamais de push d'un arbre cassé, jamais silencieux."""
+    """The driver: bounded, never pushes a broken tree, never silent."""
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
@@ -205,7 +205,7 @@ class FixTest(unittest.TestCase):
             "preparer_clone": mock.patch.object(test_agent, "preparer_clone",
                                                 return_value=(True, "")),
             "lancer_agent": mock.patch.object(test_agent, "lancer_agent",
-                                              return_value=(True, "CORRIGÉ")),
+                                              return_value=(True, "FIXED")),
             "changements": mock.patch.object(test_agent, "changements",
                                              return_value=["core/a.kt"]),
             "comment": mock.patch.object(test_agent, "comment"),
@@ -249,7 +249,7 @@ class FixTest(unittest.TestCase):
                                                   return_value=[])
         rc, actifs = self._lancer(patchs)
         self.assertEqual(rc, 2)
-        self.assertIn("aucun changement", actifs["comment"].call_args[0][2])
+        self.assertIn("no change", actifs["comment"].call_args[0][2])
         actifs["add_label"].assert_called_with("O/R", "1",
                                                test_agent.LABEL_HUMAN)
 
@@ -272,7 +272,7 @@ class FixTest(unittest.TestCase):
         actifs["pousser"].assert_not_called()
 
     def test_outillage_absent_ne_consomme_pas_l_essai(self):
-        """Runner non provisionné : code 3, aucune marque, aucun label, aucun push."""
+        """Unprovisioned runner: code 3, no marker, no label, no push."""
         patchs = self._patchs()
         patchs["lancer_agent"] = mock.patch.object(
             test_agent, "lancer_agent",
@@ -284,7 +284,7 @@ class FixTest(unittest.TestCase):
         actifs["pousser"].assert_not_called()
 
     def test_echec_agent_hors_infra_reste_livre(self):
-        """Un vrai échec de l'agent (pas l'outillage) garde son compte rendu."""
+        """A real agent failure (not tooling) keeps its report."""
         patchs = self._patchs()
         patchs["lancer_agent"] = mock.patch.object(
             test_agent, "lancer_agent", return_value=(False, "ABANDON raison"))

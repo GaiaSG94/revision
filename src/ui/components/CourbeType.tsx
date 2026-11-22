@@ -19,8 +19,9 @@ const ETIQUETTES: Record<Tendance, string> = {
 }
 
 /**
- * Sparkline SVG inline (aucune dépendance) : une ligne par type, verte si la
- * faille baisse, jaune sinon. Jamais de rouge — la charte l'interdit.
+ * Inline SVG sparkline (no dependency): one line per type, green if the
+ * weakness is decreasing, yellow otherwise. Never red — the design system
+ * forbids it.
  */
 export function CourbeType({ code, serie, tendance }: Props) {
   const largeur = 120

@@ -3,17 +3,16 @@ import { BandeauSante } from '../components/BandeauSante'
 import { Carte } from '../components/Carte'
 import { BoardDuo } from '../components/BoardDuo'
 import { COPIES_DEMO, TOUR_DEMO } from '../../pipeline/demo'
-import { useRature } from '../../etat/useRature'
+import { useRature } from '../../etat/useRevision'
 
 const TITRE = ['Turn', 'your', 'mistakes', 'into', 'moves'] as const
 
 /**
- * Accueil V9 (maquette Design/rature/accueil-v9.html, section A + C) :
- * hero corrigé — trois boutons sur une ligne (ambre / blanc / vert), titre mot
- * à mot avec « moves » en ambre — et bloc de droite = duo C1 (scan live) puis
- * C5 (téléphone). La galerie de copies vit désormais sur l'écran « Sample
- * papers » ; les petits boutons de démo du bas disparaissent : « Watch the
- * demo » les remplace.
+ * V9 home (Design/revision/accueil-v9.html mockup, sections A + C):
+ * corrected hero — three buttons on one line (amber / white / green), word-by-
+ * word title with "moves" in amber — and right-hand block = C1 duo (live scan)
+ * then C5 (phone). The paper gallery now lives on the "Sample papers" screen;
+ * the small demo buttons at the bottom are gone: "Watch the demo" replaces them.
  */
 export function Accueil() {
   const { aller, profil, analyserDemo, occupe } = useRature()
@@ -21,24 +20,24 @@ export function Accueil() {
   const copieGuidee = TOUR_DEMO.slice(0, 4)
 
   return (
-    <div className="errata-home">
-      <section className="errata-hero">
-        <div className="errata-hero-copy">
-          <p className="errata-hero-kicker">A study app for students who hate red pen.</p>
+    <div className="revision-home">
+      <section className="revision-hero">
+        <div className="revision-hero-copy">
+          <p className="revision-hero-kicker">A study app for students who hate red pen.</p>
           <h1>
             {TITRE.map((mot) => (
               <span key={mot}>
-                <span className={mot === 'moves' ? 'errata-titre-mot errata-moves' : 'errata-titre-mot'}>
+                <span className={mot === 'moves' ? 'revision-titre-mot revision-moves' : 'revision-titre-mot'}>
                   {mot}
                 </span>{' '}
               </span>
             ))}
           </h1>
-          <p className="errata-hero-lede">
+          <p className="revision-hero-lede">
             Photograph your corrected paper. We read the teacher&apos;s marks, sort them by error type,
             and build the exercise that works on <em>your</em> weakness.
           </p>
-          <div className="errata-ctas">
+          <div className="revision-ctas">
             <Bouton onClick={() => aller('cadrage')}>Photograph my paper</Bouton>
             {plusieurs ? (
               <Bouton variante="blanc" onClick={() => void analyserDemo(copieGuidee)} disabled={occupe}>
@@ -49,7 +48,7 @@ export function Accueil() {
               Try a sample paper
             </Bouton>
           </div>
-          <div className="errata-proof-stickers" aria-hidden="true">
+          <div className="revision-proof-stickers" aria-hidden="true">
             <span className="sticker sticker-rose">No grades. Ever.</span>
             <span className="sticker sticker-blanc">12 error types</span>
           </div>
@@ -58,7 +57,7 @@ export function Accueil() {
         <BoardDuo />
       </section>
 
-      <div className="errata-home-lower">
+      <div className="revision-home-lower">
         <BandeauSante />
         {profil.totalAnalyses > 0 ? (
           <Carte titre="Continue" ton="vert">

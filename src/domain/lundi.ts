@@ -1,37 +1,38 @@
 /**
- * Décision « quoi reprendre lundi » (mode prof) — logique pure, testée.
+ * "What to review on Monday" decision (teacher mode) — pure, tested logic.
  *
- * À partir de la statistique de classe, on dégage les deux types d'erreur
- * majoritaires et on propose une reprise collective concrète. Le contenu des
- * consignes est **statique** (table par code) : aucune génération, aucune
- * dépendance réseau, aucune mention culpabilisante envers les élèves.
+ * From the class statistic, we pull out the two most common error types and
+ * propose a concrete whole-class review. The instructions are **static** (a
+ * table by code): no generation, no network dependency, no blameful wording
+ * towards students.
  */
 import { CODES_ERREUR, estPonderee, libelleDe } from './taxonomy'
 import type { CodeErreur } from './taxonomy'
 import type { StatsClasse } from './types'
 
-/** Plan de reprise proposé au professeur. */
+/** Review plan proposed to the teacher. */
 export type PlanLundi = {
-  /** Types retenus, triés par fréquence décroissante (1 ou 2 entrées). */
+  /** Selected types, sorted by decreasing frequency (1 or 2 entries). */
   types: CodeErreur[]
-  /** Phrase d'action en français, ton neutre et utile. */
+  /** Action sentence in English, neutral and useful tone. */
   phrase: string
-  /** Consigne d'exercice collectif pour chaque type retenu. */
+  /** Whole-class exercise instruction for each selected type. */
   exercices: { code: CodeErreur; consigne: string }[]
-  /** Part cumulée (0..1) des types retenus dans le total pondéré. */
+  /** Cumulative share (0..1) of the selected types in the weighted total. */
   partCumulee: number
 }
 
 /**
- * Seuil de rétention du deuxième type, exprimé en part du total pondéré.
+ * Retention threshold for the second type, expressed as a share of the
+ * weighted total.
  *
- * On garde le deuxième type uniquement s'il pèse au moins 20 % des erreurs
- * pondérées de la classe. En dessous, le signal est trop faible pour justifier
- * une reprise en classe entière : on garde donc un unique type majoritaire.
+ * We keep the second type only if it accounts for at least 20% of the class's
+ * weighted errors. Below that, the signal is too weak to justify a whole-class
+ * review, so we keep a single majority type.
  */
 const SEUIL_DEUXIEME_TYPE = 0.2
 
-/** Consignes collectives, une par type — contenu statique, jamais généré. */
+/** Whole-class instructions, one per type — static content, never generated. */
 const CONSIGNES: Record<(typeof CODES_ERREUR)[number], string> = {
   E01: 'Five expansions with a negative factor, done at the board while naming each sign.',
   E02: 'Three double distributivities where every term in the parentheses is multiplied, checked in pairs.',
@@ -47,18 +48,18 @@ const CONSIGNES: Record<(typeof CODES_ERREUR)[number], string> = {
   E12: 'Two short proofs to complete by writing each logical implication that links the steps.',
 }
 
-/** Consigne d'un type retenu ; E99 n'étant jamais retenu, ce repli est défensif. */
+/** Instruction for a selected type; since E99 is never selected, this fallback is defensive. */
 function consignePour(code: CodeErreur): string {
   if (code === 'E99') return 'Targeted review with the class.'
   return CONSIGNES[code]
 }
 
-/** Total pondéré restreint aux codes effectivement pondérés (hors E11, E99). */
+/** Weighted total restricted to actually weighted codes (excluding E11, E99). */
 function totalPondereStats(stats: StatsClasse): number {
   return CODES_ERREUR.reduce((somme, code) => somme + (estPonderee(code) ? stats.parType[code] ?? 0 : 0), 0)
 }
 
-/** Types pondérés classés par fréquence décroissante, puis ordre de la taxonomie. */
+/** Weighted types sorted by decreasing frequency, then by taxonomy order. */
 function typesTries(stats: StatsClasse): CodeErreur[] {
   return CODES_ERREUR.filter((code) => estPonderee(code) && (stats.parType[code] ?? 0) > 0).sort(
     (a, b) => (stats.parType[b] ?? 0) - (stats.parType[a] ?? 0),

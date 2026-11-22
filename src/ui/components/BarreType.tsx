@@ -3,7 +3,7 @@ import type { CodeErreur } from '../../domain/taxonomy'
 
 type Props = { code: CodeErreur; occurrences: number; part: number }
 
-/** Barre de récurrence : vert = progression, jamais de rouge (§10). */
+/** Recurrence bar: green = progress, never red (§10). */
 export function BarreType({ code, occurrences, part }: Props) {
   const pourcentage = Math.round(part * 100)
   return (

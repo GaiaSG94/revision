@@ -1,40 +1,39 @@
-# Latence de l’amont (relevé automatique)
+# Upstream latency (automatic readings)
 
-Mesuré par `scripts/sonder-latence.mjs`, lancé chaque heure par `.github/workflows/latence.yml`.
-Un **seconde** par appel, en série : on ne lance pas de rafale, qui fausserait la mesure et
-saturerait l’amont.
+Measured by `scripts/sonder-latence.mjs`, run every hour by `.github/workflows/latence.yml`.
+**One** call per invocation, in series: no burst, which would skew the measurement and saturate the
+upstream.
 
-Ce relevé sert à trois choses : choisir l’heure du tournage de la vidéo sur des données, prouver
-la disponibilité pendant le jugement (RNF-08), et documenter honnêtement la contrainte
-(l’amont est une place de marché : la latence varie d’un facteur 3 selon l’heure).
+These readings serve three purposes: choosing the recording hour from data, proving availability
+during judging (RNF-08), and honestly documenting the constraint (the upstream is a marketplace:
+latency varies by a factor of 3 depending on the time of day).
 
-> Le fichier est versionné sur la branche `donnees/latence` : `main` est protégé par un
-> ruleset (PR obligatoire), un push automatique y serait refusé.
+> The file is versioned on the `donnees/latence` branch: `main` is protected by a ruleset (PR
+> required), an automatic push there would be rejected.
 
-## Synthèse sur 24 h
+## 24-hour summary
 
-- Mesures : **2**
-- Taux de disponibilité : **50 %**
-- Latence médiane des appels réussis : **6.9 s**
-- Modèle le plus fiable : **ag/gemini-3.8-flash-high (100 % de réussite sur 24 h)**
+- Measurements: **2**
+- Availability rate: **50%**
+- Median latency of successful calls: **6.9 s**
+- Most reliable model: **ag/gemini-3.8-flash-high (100% success over 24 h)**
 
-## Historique
+## History
 
-| Horodatage (UTC) | Modèle | HTTP | Latence | Disponible |
+| Timestamp (UTC) | Model | HTTP | Latency | Available |
 | --- | --- | --- | --- | --- |
-| 2026-11-12T14:24:48.001Z | `ag/gemini-3.8-flash-high` | 200 | 6.9 s | oui |
-| 2026-11-12T14:24:48.001Z | `ag/gemini-4-carbon` | 503 | 0.5 s | non |
+| 2026-11-12T14:24:48.001Z | `ag/gemini-3.8-flash-high` | 200 | 6.9 s | yes |
+| 2026-11-12T14:24:48.001Z | `ag/gemini-4-carbon` | 503 | 0.5 s | no |
 
-## Relevés manuels antérieurs au banc automatique
+## Earlier manual readings (before the automatic bench)
 
-| Date | Modèle | Résultat |
+| Date | Model | Result |
 | --- | --- | --- |
-| 11/11 21 h | `ag/gemini-4-carbon` | 200 en 16 s |
-| 11/11 21 h | `ag/claude-sonnet-4-6` | 200 en 16 s, puis 503 cinq minutes plus tard |
-| 11/11 21 h | `ag/gemini-3.8-flash-high` | 200 en 45-52 s |
-| 11/11 21 h | `ag/gemini-4-argon`, `ag/claude-sonnet-5-5`, `ag/claude-opus-4-6-thinking` | 503 |
-| 11/11 21 h | `oai/gpt-5.4-mini`, `ali/deepseek-v4.1-flash` | 402 hors enchère |
-| 11/11 21 h | `cbcn/glm-5.3-flash` | 403 désactivé dans les préférences du compte |
-| 12/11 13 h | `ag/gemini-3.8-flash-high` | 200 en 56,7 s (5 tokens) |
-| 12/11 13 h | `ag/gemini-4-carbon` | 503 |
-
+| 11 Nov, 21:00 | `ag/gemini-4-carbon` | 200 in 16 s |
+| 11 Nov, 21:00 | `ag/claude-sonnet-4-6` | 200 in 16 s, then 503 five minutes later |
+| 11 Nov, 21:00 | `ag/gemini-3.8-flash-high` | 200 in 45–52 s |
+| 11 Nov, 21:00 | `ag/gemini-4-argon`, `ag/claude-sonnet-5-5`, `ag/claude-opus-4-6-thinking` | 503 |
+| 11 Nov, 21:00 | `oai/gpt-5.4-mini`, `ali/deepseek-v4.1-flash` | 402 out of bid |
+| 11 Nov, 21:00 | `cbcn/glm-5.3-flash` | 403 disabled in account preferences |
+| 12 Nov, 13:00 | `ag/gemini-3.8-flash-high` | 200 in 56.7 s (5 tokens) |
+| 12 Nov, 13:00 | `ag/gemini-4-carbon` | 503 |

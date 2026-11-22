@@ -1,6 +1,6 @@
 /**
- * Exports (RF-21 CSV du profil, RF-22 fiche de révision Markdown).
- * Logique pure : aucune dépendance au DOM, testée dans `tests/export.test.ts`.
+ * Exports (RF-21 profile CSV, RF-22 Markdown revision sheet).
+ * Pure logic: no DOM dependency, tested in `tests/export.test.ts`.
  */
 import { libelleDe } from '../domain/taxonomy'
 import type { CodeErreur } from '../domain/taxonomy'
@@ -12,7 +12,7 @@ function csvCell(valeur: string | number): string {
   return /[",\n;]/.test(texte) ? `"${texte.replace(/"/g, '""')}"` : texte
 }
 
-/** Profil → CSV (séparateur `;`, attendu par les tableurs francophones). */
+/** Profile → CSV (`;` separator, expected by French-speaking spreadsheet apps). */
 export function profilEnCsv(profil: Profil): string {
   const lignes: string[] = ['code,label,count,percent']
   for (const entree of classement(profil)) {
@@ -29,11 +29,11 @@ export function profilEnCsv(profil: Profil): string {
   return lignes.join('\n')
 }
 
-/** Fiche de révision Markdown : le type dominant, ce qu'il veut dire, 3 conseils. */
+/** Markdown revision sheet: the dominant type, what it means, 3 tips. */
 export function ficheEnMarkdown(profil: Profil, diagnostics: Diagnostic[]): string {
   const dominant = typeDominant(profil)
   const date = new Date().toISOString().slice(0, 10)
-  const lignes: string[] = [`# My Errata sheet — ${date}`, '']
+  const lignes: string[] = [`# My Revision sheet — ${date}`, '']
 
   if (!dominant) {
     lignes.push('No recurring mistake yet. Add a corrected paper.')
@@ -43,7 +43,7 @@ export function ficheEnMarkdown(profil: Profil, diagnostics: Diagnostic[]): stri
   lignes.push(
     `**${phraseSynthese(profil)}.**`,
     '',
-    `Type dominant : \`${dominant}\` — ${libelleDe(dominant)}.`,
+    `Dominant type: \`${dominant}\` — ${libelleDe(dominant)}.`,
     '',
     '## What to work on',
     '',
@@ -58,11 +58,11 @@ export function ficheEnMarkdown(profil: Profil, diagnostics: Diagnostic[]): stri
     lignes.push(`- ${diagnostic.createdAt.slice(0, 10)} — ${diagnostic.nbFautes} mistake(s): ${types || 'none'}`)
   }
 
-  lignes.push('', '_Generated locally by Errata. No paper is ever stored._')
+  lignes.push('', '_Generated locally by Revision. No paper is ever stored._')
   return lignes.join('\n')
 }
 
-/** Statistique de classe → CSV (RF-21 côté professeur). */
+/** Class statistic → CSV (RF-21, teacher side). */
 export function statsEnCsv(stats: StatsClasse): string {
   const total = Object.values(stats.parType).reduce((somme, n) => somme + n, 0)
   const lignes: string[] = ['papers,code,label,count,percent']

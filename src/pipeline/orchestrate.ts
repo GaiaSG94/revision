@@ -1,7 +1,7 @@
 /**
- * Orchestrateur du pipeline (§18.2) : six étapes, une progression visible,
- * une latence mesurée par étape. L'attente devient une démonstration du
- * produit — et un échec d'étape dit précisément où ça a cassé.
+ * Pipeline orchestrator (§18.2): six steps, visible progress, latency measured
+ * per step. Waiting becomes a demonstration of the product — and a step failure
+ * says exactly where it broke.
  */
 import { construireDiagnostic } from '../domain/diagnostic'
 import { ecrireCache, empreinteImage, lireCache } from '../storage/cache'
@@ -21,25 +21,24 @@ export type OptionsAnalyse = {
   onProgression?: (progression: Progression) => void
   client?: ClientBrut
   niveau?: string
-  /** Injectables pour les tests : identifiant et horodatage déterministes. */
+  /** Injectable for tests: deterministic identifier and timestamp. */
   id?: string
   maintenant?: () => Date
-  /** Cache local des analyses (défaut : actif). Désactivable dans Réglages. */
+  /** Local analysis cache (default: active). Can be disabled in Settings. */
   cache?: boolean
-  /** Exercice inédit demandé (modèle appelé) au lieu de la banque locale. */
+  /** Fresh exercise requested (model called) instead of the local bank. */
   inedit?: boolean
   /**
-   * Publié dès la fin de l'étape 5 : le diagnostic s'affiche pendant que
-   * l'exercice se prépare (RNF-01 porte sur photo → diagnostic, pas sur
-   * photo → exercice).
+   * Published as soon as step 5 ends: the diagnosis is displayed while the
+   * exercise is being prepared (RNF-01 covers photo → diagnosis, not
+   * photo → exercise).
    */
   onResultatPartiel?: (partiel: ResultatAnalyse) => void
 }
 
 /**
- * Exécute une étape en publiant son état, sa durée **et sa preuve** : ce que
- * l'étape a réellement produit. La preuve est calculée à partir du résultat,
- * donc elle ne peut pas mentir.
+ * Runs a step, publishing its state, duration **and proof**: what the step
+ * actually produced. The proof is computed from the result, so it cannot lie.
  */
 async function etape<T>(
   id: EtapeId,
@@ -66,7 +65,7 @@ async function etape<T>(
   }
 }
 
-/** Codes lus dans l'ordre, pour la preuve de l'étape de classification. */
+/** Codes read in order, for the classification step's proof. */
 export function codesDe(erreurs: { code: string }[]): string {
   const uniques = [...new Set(erreurs.map((erreur) => erreur.code))]
   return uniques.length > 0 ? uniques.join(', ') : 'none'
@@ -99,25 +98,25 @@ export async function analyserCopie(
         : 'no name area to mask',
   )
 
-  // Cache local : même photo (à l'octet près après normalisation) → réponse
-  // immédiate, aucun appel. Jamais l'image en cache, seulement son empreinte.
+  // Local cache: same photo (byte-for-byte after normalization) → immediate
+  // answer, no call. Never the image in cache, only its fingerprint.
   if (options.cache !== false) {
     const depuisCache = await depuisLeCache(anonyme.dataUrl, options, publier)
     if (depuisCache) return depuisCache
   }
-  // Un seul appel vision pour les étapes 3 et 4 : l'amont coûte 16 à 50 s par
-  // aller-retour, la fusion tient le budget « photo → diagnostic » (RNF-01).
+  // A single vision call for steps 3 and 4: the upstream costs 16 to 50 s per
+  // round trip, merging keeps the "photo → diagnosis" budget (RNF-01).
   const analyse = await etape(
     'extrait',
     publier,
     () => analyserImage(anonyme.dataUrl, options.transport, options.client),
     (resultat) =>
       `${resultat.extraction.annotations.length} annotation(s) found on the paper` +
-      (resultat.extraction.copiePropre ? ' — copie propre, aucune faute' : ''),
+      (resultat.extraction.copiePropre ? ' — clean paper, no errors' : ''),
   )
   const { extraction } = analyse
-  // Étape 4 : les règles restent locales (seuil 0,6, E99, E11 pondérée à 0),
-  // puis seconde passe sur les fautes peu sûres — cible : zéro faux positif.
+  // Step 4: the rules stay local (0.6 threshold, E99, E11 weighted 0), then a
+  // second pass on uncertain errors — target: zero false positives.
   const classification = await etape(
     'classifie',
     publier,
@@ -145,8 +144,8 @@ export async function analyserCopie(
       `profile updated: ${resultat.nbFautes} mistake(s), main type ${resultat.typeDominant ?? 'none'}`,
   )
 
-  // Le diagnostic est affiché dès maintenant : l'exercice se prépare derrière
-  // (RNF-01 porte sur photo → diagnostic).
+  // The diagnosis is displayed now: the exercise is prepared behind the scenes
+  // (RNF-01 covers photo → diagnosis).
   options.onResultatPartiel?.({
     diagnostic,
     extraction,
@@ -162,18 +161,18 @@ export async function analyserCopie(
     () => produireExercice(diagnostic.typeDominant, extraction, options, publier),
     (resultat) =>
       resultat.exercice
-        ? `exercice ${
+        ? `exercise ${
             resultat.exercice.exercice.source === 'banque'
               ? 'from the local bank'
               : 'fresh, generated by the model'
-          } sur ${resultat.exercice.exercice.typeTravaille} — garde-fou : ${
+          } on ${resultat.exercice.exercice.typeTravaille} — safeguard: ${
             resultat.exercice.verdict.travailleLeBonType &&
             resultat.exercice.verdict.neDonneLaSolutionOrigine &&
             resultat.exercice.verdict.memeNiveau
               ? '3 criteria passed'
               : 'rejected'
           }`
-        : (resultat.message ?? 'pas d’exercice disponible'),
+        : (resultat.message ?? 'no exercise available'),
   )
   const resultat: ResultatAnalyse = {
     diagnostic,
@@ -184,7 +183,7 @@ export async function analyserCopie(
     ...(exercice.message ? { messageExercice: exercice.message } : {}),
   }
   if (options.cache !== false) {
-    // L'image ne part jamais en cache (RNF-P1) : seulement le diagnostic.
+    // The image is never cached (RNF-P1): only the diagnosis.
     const { imageAnonymisee: _image, ...sansImage } = resultat
     void ecrireCache(await empreinteImage(anonyme.dataUrl), {
       ...sansImage,
@@ -194,7 +193,7 @@ export async function analyserCopie(
   return resultat
 }
 
-/** Résultat rejoué depuis le cache local, progression publiée pour rester lisible. */
+/** Result replayed from the local cache, with progress published to stay readable. */
 async function depuisLeCache(
   dataUrl: string,
   options: OptionsAnalyse,
@@ -209,7 +208,7 @@ async function depuisLeCache(
     agrege: `profile already up to date: ${enCache.diagnostic.nbFautes} mistake(s)`,
     genere: enCache.exercice
       ? `exercise already ready on ${enCache.exercice.exercice.typeTravaille}`
-      : (enCache.messageExercice ?? 'pas d’exercice disponible'),
+      : (enCache.messageExercice ?? 'no exercise available'),
   }
   for (const etapeId of etapes) {
     publier({
@@ -224,7 +223,7 @@ async function depuisLeCache(
   return { ...enCache, imageAnonymisee: dataUrl }
 }
 
-/** L'étape 6 ne doit jamais faire échouer le diagnostic : elle est facultative. */
+/** Step 6 must never make the diagnosis fail: it is optional. */
 async function produireExercice(
   typeDominant: CodeErreur | null,
   extraction: { annotations: { ligne: string }[] },
@@ -237,7 +236,7 @@ async function produireExercice(
   }
   const extrait = extraitPourExercice(extraction.annotations.map((a) => a.ligne))
   try {
-    // Banque locale d'abord : l'étape 6 ne coûte alors **aucun** appel réseau.
+    // Local bank first: step 6 then costs **no** network call.
     return await etape('genere', publier, () =>
       obtenirExercice({
         typeDominant,

@@ -1,22 +1,21 @@
 #!/usr/bin/env node
 /**
- * Banc de latence horaire — idée 10 du brassage « rester sur InferHub ».
+ * Hourly latency bench — idea 10 from the "stay on InferHub" brainstorm.
  *
- * Mesure la disponibilité et la latence de chaque modèle de la chaîne, et met
- * à jour `docs/LATENCE.md` (tableau horodaté + synthèse sur 24 h).
+ * Measures the availability and latency of each model in the chain, and
+ * updates `docs/LATENCE.md` (timestamped table + 24 h summary).
  *
- * Pourquoi : l'amont est une place de marché. La latence varie d'un facteur 3
- * entre le soir et 13 h, et 5 modèles sur 6 peuvent être en 503 au même
- * instant. Sans relevé automatique, on choisirait l'heure du tournage à
- * l'intuition — et on ne pourrait pas prouver la disponibilité pendant le
- * jugement (RNF-08).
+ * Why: the upstream is a marketplace. Latency varies by a factor of 3 between
+ * the evening and 1 p.m., and 5 models out of 6 can be in 503 at the same
+ * moment. Without automatic readings, we would pick the filming time by
+ * intuition — and could not prove availability during judging (RNF-08).
  *
- * Usage :
+ * Usage:
  *   INFERHUB_API_KEY=… node scripts/sonder-latence.mjs
  *   node scripts/sonder-latence.mjs --modeles a,b --timeout-ms 90000 --sortie docs/LATENCE.md
- *   node scripts/sonder-latence.mjs --seche     # n'écrit rien (utile sans clé)
+ *   node scripts/sonder-latence.mjs --seche     # writes nothing (useful without a key)
  *
- * Sans clé, le script avertit et sort en 0 : il ne doit jamais casser une CI.
+ * Without a key, the script warns and exits 0: it must never break CI.
  */
 import { readFile, writeFile } from 'node:fs/promises'
 import { argv, env, exit } from 'node:process'
@@ -48,7 +47,7 @@ function drapeaux() {
   }
 }
 
-/** Un appel texte minimal : 5 tokens suffisent pour mesurer la disponibilité. */
+/** A minimal text call: 5 tokens are enough to measure availability. */
 async function sonder(modele, cle, timeoutMs) {
   const debut = Date.now()
   const controleur = new AbortController()
@@ -84,7 +83,7 @@ async function sonder(modele, cle, timeoutMs) {
   }
 }
 
-/** Médiane sur une liste de nombres. */
+/** Median of a list of numbers. */
 function mediane(valeurs) {
   if (valeurs.length === 0) return null
   const triees = [...valeurs].sort((a, b) => a - b)
@@ -112,35 +111,35 @@ function analyserLignes(lignes) {
     total: recentes.length,
     taux: recentes.length === 0 ? 0 : (succes.length / recentes.length) * 100,
     mediane: mediane(latences),
-    meilleur: meilleur ? `${meilleur[0]} (${Math.round((meilleur[1].ok / meilleur[1].total) * 100)} % de réussite sur 24 h)` : '—',
+    meilleur: meilleur ? `${meilleur[0]} (${Math.round((meilleur[1].ok / meilleur[1].total) * 100)}% success over 24 h)` : '—',
   }
 }
 
 function rendreFichier(lignes, synthese) {
   const entete = [
-    '# Latence de l’amont (relevé automatique)',
+    '# Upstream latency (automatic readings)',
     '',
-    'Mesuré par `scripts/sonder-latence.mjs`, lancé chaque heure par `.github/workflows/latence.yml`.',
-    'Un **seconde** par appel, en série : on ne lance pas de rafale, qui fausserait la mesure et',
-    'saturerait l’amont.',
+    'Measured by `scripts/sonder-latence.mjs`, run hourly by `.github/workflows/latence.yml`.',
+    '**One second** per call, in series: we do not fire a burst, which would skew the measurement and',
+    'saturate the upstream.',
     '',
-    'Ce relevé sert à trois choses : choisir l’heure du tournage de la vidéo sur des données, prouver',
-    'la disponibilité pendant le jugement (RNF-08), et documenter honnêtement la contrainte',
-    '(l’amont est une place de marché : la latence varie d’un facteur 3 selon l’heure).',
+    'These readings serve three purposes: choose the video filming time based on data, prove',
+    'availability during judging (RNF-08), and honestly document the constraint',
+    '(the upstream is a marketplace: latency varies by a factor of 3 depending on the hour).',
     '',
-    '> Le fichier est versionné sur la branche `donnees/latence` : `main` est protégé par un',
-    '> ruleset (PR obligatoire), un push automatique y serait refusé.',
+    '> The file is versioned on the `donnees/latence` branch: `main` is protected by a',
+    '> ruleset (PR required), an automatic push there would be refused.',
     '',
-    '## Synthèse sur 24 h',
+    '## 24-hour summary',
     '',
-    `- Mesures : **${synthese.total}**`,
-    `- Taux de disponibilité : **${synthese.taux.toFixed(0)} %**`,
-    `- Latence médiane des appels réussis : **${synthese.mediane === null ? '—' : `${synthese.mediane.toFixed(1)} s`}**`,
-    `- Modèle le plus fiable : **${synthese.meilleur}**`,
+    `- Measurements: **${synthese.total}**`,
+    `- Availability rate: **${synthese.taux.toFixed(0)}%**`,
+    `- Median latency of successful calls: **${synthese.mediane === null ? '—' : `${synthese.mediane.toFixed(1)} s`}**`,
+    `- Most reliable model: **${synthese.meilleur}**`,
     '',
     '## Historique',
     '',
-    '| Horodatage (UTC) | Modèle | HTTP | Latence | Disponible |',
+    '| Timestamp (UTC) | Model | HTTP | Latency | Available |',
     '| --- | --- | --- | --- | --- |',
   ]
   const corps = lignes.map(
@@ -149,18 +148,18 @@ function rendreFichier(lignes, synthese) {
   )
   const annexe = [
     '',
-    '## Relevés manuels antérieurs au banc automatique',
+    '## Manual readings before the automatic bench',
     '',
-    '| Date | Modèle | Résultat |',
+    '| Date | Model | Result |',
     '| --- | --- | --- |',
-    '| 11/11 21 h | `ag/gemini-4-carbon` | 200 en 16 s |',
-    '| 11/11 21 h | `ag/claude-sonnet-4-6` | 200 en 16 s, puis 503 cinq minutes plus tard |',
-    '| 11/11 21 h | `ag/gemini-3.8-flash-high` | 200 en 45-52 s |',
-    '| 11/11 21 h | `ag/gemini-4-argon`, `ag/claude-sonnet-5-5`, `ag/claude-opus-4-6-thinking` | 503 |',
-    '| 11/11 21 h | `oai/gpt-5.4-mini`, `ali/deepseek-v4.1-flash` | 402 hors enchère |',
-    '| 11/11 21 h | `cbcn/glm-5.3-flash` | 403 désactivé dans les préférences du compte |',
-    '| 12/11 13 h | `ag/gemini-3.8-flash-high` | 200 en 56,7 s (5 tokens) |',
-    '| 12/11 13 h | `ag/gemini-4-carbon` | 503 |',
+    '| 11/11 9 p.m. | `ag/gemini-4-carbon` | 200 in 16 s |',
+    '| 11/11 9 p.m. | `ag/claude-sonnet-4-6` | 200 in 16 s, then 503 five minutes later |',
+    '| 11/11 9 p.m. | `ag/gemini-3.8-flash-high` | 200 in 45-52 s |',
+    '| 11/11 9 p.m. | `ag/gemini-4-argon`, `ag/claude-sonnet-5-5`, `ag/claude-opus-4-6-thinking` | 503 |',
+    '| 11/11 9 p.m. | `oai/gpt-5.4-mini`, `ali/deepseek-v4.1-flash` | 402 out of auction |',
+    '| 11/11 9 p.m. | `cbcn/glm-5.3-flash` | 403 disabled in account preferences |',
+    '| 12/11 1 p.m. | `ag/gemini-3.8-flash-high` | 200 in 56.7 s (5 tokens) |',
+    '| 12/11 1 p.m. | `ag/gemini-4-carbon` | 503 |',
     '',
   ]
   return `${[...entete, ...corps, ...annexe].join('\n')}\n`
@@ -172,7 +171,7 @@ async function main() {
   const modeles = options.modeles.length > 0 ? options.modeles : CHAINE
 
   if (!cle) {
-    console.warn('INFERHUB_API_KEY absente : relevé ignoré (rien n’est écrit).')
+    console.warn('INFERHUB_API_KEY missing: reading skipped (nothing is written).')
     return
   }
 
@@ -203,10 +202,10 @@ async function main() {
   const toutes = [...dejaParsees, ...lignes].slice(-LIGNES_MAX)
   const synthese = analyserLignes(toutes)
   await writeFile(options.sortie, rendreFichier(toutes, synthese), 'utf8')
-  console.log(`${options.sortie} mis à jour (${toutes.length} lignes, ${synthese.total} sur 24 h)`)
+  console.log(`${options.sortie} updated (${toutes.length} lines, ${synthese.total} over 24 h)`)
 }
 
 main().catch((erreur) => {
-  console.error('sonde de latence :', erreur?.message ?? erreur)
+  console.error('latency probe:', erreur?.message ?? erreur)
   exit(0)
 })

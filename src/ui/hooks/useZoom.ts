@@ -1,11 +1,11 @@
 /**
- * Zoom et recadrage de la copie — lot 7. Logique **pure** (aucun DOM) pour être
- * testable en Node ; le composant ne fait qu'appliquer la transformation CSS.
+ * Zoom and reframing of the paper — batch 7. **Pure** logic (no DOM) so it can
+ * be tested in Node; the component only applies the CSS transform.
  *
- * Convention : `transform: translate(x%, y%) scale(e)`. Les pourcentages de
- * translation sont relatifs à la taille NON mise à l'échelle de l'image, donc
- * un point en coordonnées relatives (cx, cy) se recentre en ramenant
- * x = (0,5 − cx) × e × 100, borné pour que l'image ne sorte jamais du cadre.
+ * Convention: `transform: translate(x%, y%) scale(e)`. Translation percentages
+ * are relative to the UNscaled size of the image, so a point in relative
+ * coordinates (cx, cy) is recentred by setting x = (0.5 − cx) × e × 100, bounded
+ * so the image never leaves the frame.
  */
 import type { Zone } from '../../domain/types'
 
@@ -24,19 +24,19 @@ export function reinitialiser(): Vue {
   return { echelle: 1, x: 0, y: 0 }
 }
 
-/** Translation maximale (en %) pour que l'image remplisse toujours le cadre. */
+/** Maximum translation (in %) so the image always fills the frame. */
 function limite(echelle: number): number {
   return (echelle - 1) * 50
 }
 
-/** Ramène la vue dans le cadre : échelle bornée, translation bornée. */
+/** Brings the view back into the frame: bounded scale, bounded translation. */
 export function borner(vue: Vue): Vue {
   const echelle = clamp(vue.echelle, ECHELLE_MIN, ECHELLE_MAX)
   const max = limite(echelle)
   return { echelle, x: clamp(vue.x, -max, max), y: clamp(vue.y, -max, max) }
 }
 
-/** Centre une zone (coordonnées relatives 0..1) à l'échelle cible. */
+/** Centres a zone (relative coordinates 0..1) at the target scale. */
 export function centrerSurZone(zone: Zone, echelleCible = ECHELLE_CIBLE_ZONE): Vue {
   const echelle = clamp(echelleCible, ECHELLE_MIN, ECHELLE_MAX)
   const cx = clamp(zone.x + zone.largeur / 2, 0, 1)
@@ -44,7 +44,7 @@ export function centrerSurZone(zone: Zone, echelleCible = ECHELLE_CIBLE_ZONE): V
   return borner({ echelle, x: (0.5 - cx) * echelle * 100, y: (0.5 - cy) * echelle * 100 })
 }
 
-/** Zoom avant/arrière autour du centre, borné. */
+/** Zoom in/out around the centre, bounded. */
 export function zoomer(vue: Vue, delta: number): Vue {
   return borner({ ...vue, echelle: vue.echelle + delta })
 }

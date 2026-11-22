@@ -5,43 +5,43 @@ import { BlocListe } from './BlocListe'
 import { LienExterne } from './LienExterne'
 import { docDuDepot } from './lienDepot'
 
-/** Ce que le produit appelle pendant une analyse — et rien d’autre. */
+/** What the product calls during an analysis — and nothing else. */
 const PRODUIT = [
-  `Une API multimodale [OI]-compatible servie par InferHub (${AMONT_PAR_DEFAUT}), derrière un proxy edge qui garde la clé côté serveur. En secours, tu peux coller ta propre clé (BYOK) : elle reste sur ton appareil.`,
-  `Modèle par défaut ${MODELE_PAR_DEFAUT}, avec une chaîne de repli sur ${CHAINE_MODELES.length} modèles de la famille ag/ : un 402 ou un 5xx fait passer au suivant, l’analyse aboutit quand même.`,
-  'Trois usages, pas un de plus : relever et typer les annotations du professeur (vision), générer l’exercice ciblé, puis juger cet exercice (garde-fou). Aucun OCR classique.',
-  'Les prompts sont versionnés dans prompts/ (analyse, extraction, classification, revue, génération, garde-fou) : ils font partie du produit au même titre que le code.',
+  `An [OI]-compatible multimodal API served by InferHub (${AMONT_PAR_DEFAUT}), behind an edge proxy that keeps the key server-side. As a fallback, you can paste your own key (BYOK): it stays on your device.`,
+  `Default model ${MODELE_PAR_DEFAUT}, with a fallback chain over ${CHAINE_MODELES.length} models in the ag/ family: a 402 or a 5xx moves to the next one, and the analysis still succeeds.`,
+  'Three uses, no more: read and type the teacher\u2019s annotations (vision), generate the targeted exercise, then judge that exercise (guardrail). No classic OCR.',
+  'Prompts are versioned in prompts/ (analysis, extraction, classification, review, generation, guardrail): they are part of the product just like the code.',
 ]
 
-/** Ce qui a été assisté pendant le hackathon, déclaré sans zone grise. */
+/** What was assisted, declared without any grey area. */
 const DEVELOPPEMENT = [
-  'Agents de codage ZeroClaw et leurs sous-agents : écriture du code TypeScript/React, des tests, de la configuration CI et de la documentation.',
-  'Modèles via InferHub : résolution automatique des conflits de rebase dans la file de merge.',
-  'Agent de périmètre CI : rédaction du bloc « Scope » des pull requests à partir du diff.',
-  'Estimation honnête : la majorité du volume de code est assistée, la totalité des décisions de conception et des règles métier est humaine.',
+  'ZeroClaw coding agents and their sub-agents: writing the TypeScript/React code, the tests, the CI configuration and the documentation.',
+  'Models via InferHub: automatic resolution of rebase conflicts in the merge queue.',
+  'CI scope agent: drafting the "Scope" block of pull requests from the diff.',
+  'Honest estimate: most of the code volume is assisted, all design decisions and business rules are human.',
 ]
 
-/** Ce qui n’est pas généré — les décisions qui font le produit. */
+/** What is not generated — the decisions that make the product. */
 const DECISIONS = [
-  'La taxonomie des 12 types et leurs signatures.',
-  'Les règles de pondération du profil : seuil de confiance, E99 exclue, E11 à poids nul.',
-  'Le corpus de validation et la vérité terrain associée.',
-  'La palette, et le refus du rouge dans l’interface : la copie est déjà annotée en rouge par le professeur.',
+  'The taxonomy of 12 types and their signatures.',
+  'The profile weighting rules: confidence threshold, E99 excluded, E11 with zero weight.',
+  'The validation corpus and its associated ground truth.',
+  'The colour palette, and the refusal of red in the interface: the paper is already annotated in red by the teacher.',
 ]
 
-/** Section 6 : l’IA appelée par le produit, l’IA qui a aidé à l’écrire. */
+/** Section 6: the AI called by the product, and the AI that helped write it. */
 export function SectionOutilsIA() {
   return (
     <Section {...SECTIONS.outilsIA}>
       <p className="text-sm text-muet">
-        Deux usages distincts, et ils ne se mélangent pas : l’IA que le produit appelle pour toi
-        pendant une analyse, et l’IA qui a aidé à l’écrire pendant le hackathon.
+        Two distinct uses, and they do not mix: the AI the product calls for you during an analysis,
+        and the AI that helped write it.
       </p>
-      <BlocListe titre="Ce que le produit appelle" items={PRODUIT} />
-      <BlocListe titre="Ce qui a été assisté pour le développement" items={DEVELOPPEMENT} />
-      <BlocListe titre="Ce qui n’est pas généré" items={DECISIONS} ton="vert" />
+      <BlocListe titre="What the product calls" items={PRODUIT} />
+      <BlocListe titre="What was assisted in development" items={DEVELOPPEMENT} />
+      <BlocListe titre="What is not generated" items={DECISIONS} ton="vert" />
       <p className="text-sm text-muet">
-        Déclaration complète, outil par outil :{' '}
+        Full declaration, tool by tool:{' '}
         <LienExterne href={docDuDepot('docs/DECLARATION-IA.md')}>docs/DECLARATION-IA.md</LienExterne>.
       </p>
     </Section>

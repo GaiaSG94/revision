@@ -15,13 +15,13 @@ const CLASSES: Record<NonNullable<Props['variante']>, string> = {
   secondaire:
     'bg-surface text-texte border-[3px] border-texte font-bold ombre-dure hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-40',
   discret: 'bg-transparent text-muet hover:text-texte underline underline-offset-4',
-  /** V9 : les trois boutons du hero — ambre (action principale), blanc, menthe. */
+  /** V9: the three hero buttons — amber (main action), white, mint. */
   ambre: 'bg-ambre text-texte border-[3px] border-texte font-bold ombre-dure hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-40',
   blanc: 'bg-white text-texte border-[3px] border-texte font-bold ombre-dure hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-40',
   menthe: 'bg-menthe text-texte border-[3px] border-texte font-bold ombre-dure hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-40',
 }
 
-/** Bouton unique du produit : grosses cibles, contraste AA, focus visible. */
+/** The product’s single button: large targets, AA contrast, visible focus. */
 export function Bouton({
   children,
   onClick,

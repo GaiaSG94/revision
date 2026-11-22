@@ -4,67 +4,67 @@ import { LigneLien } from './LigneLien'
 import type { Lien } from './LigneLien'
 import { DEMO, DEPOT, docDuDepot } from './lienDepot'
 
-/** Deux groupes : voir le produit, puis lire ce qui le documente. */
+/** Two groups: see the product, then read what documents it. */
 const GROUPES: { titre: string; liens: Lien[] }[] = [
   {
-    titre: 'Voir le produit',
+    titre: 'See the product',
     liens: [
       {
-        etiquette: 'Démo en ligne',
+        etiquette: 'Online demo',
         href: DEMO,
         detail:
-          'La webapp déployée, utilisable sans installation. Un mode démonstration prend le relais si l’amont est saturé.',
+          'The deployed webapp, usable without installation. A demo mode takes over if the upstream is saturated.',
       },
       {
-        etiquette: 'Dépôt GitHub',
+        etiquette: 'GitHub repository',
         href: DEPOT,
-        detail: 'Code, tests, corpus, prompts et CI : tout est public, sous licence MIT.',
+        detail: 'Code, tests, corpus, prompts and CI: everything is public, under the MIT licence.',
       },
     ],
   },
   {
-    titre: 'Les documents du dépôt',
+    titre: 'Repository documents',
     liens: [
       {
         etiquette: 'README',
         href: docDuDepot('README.md'),
-        detail: 'Le produit en une page : pipeline, taxonomie, règles du profil, comment lancer.',
+        detail: 'The product in one page: pipeline, taxonomy, profile rules, how to run it.',
       },
       {
         etiquette: 'Write-up',
         href: docDuDepot('docs/WRITEUP.md'),
-        detail: 'Le récit de conception : le problème, les choix, les impasses assumées.',
+        detail: 'The design story: the problem, the choices, the accepted dead ends.',
       },
       {
-        etiquette: 'Script vidéo',
+        etiquette: 'Video script',
         href: docDuDepot('docs/SCRIPT-VIDEO.md'),
-        detail: 'Le découpage seconde par seconde de la vidéo de soumission (3 minutes).',
+        detail: 'The second-by-second breakdown of the demo video (3 minutes).',
       },
       {
-        etiquette: 'Checklist de soumission',
+        etiquette: 'Product checklist',
         href: docDuDepot('docs/CHECKLIST-SOUMISSION.md'),
-        detail: 'Les critères d’acceptation du concours, un par un, et où chacun est tenu.',
+        detail: 'The contest acceptance criteria, one by one, and where each is met.',
       },
       {
         etiquette: 'Architecture',
         href: docDuDepot('docs/ARCHITECTURE.md'),
-        detail: 'Les quatre choix structurants, le pipeline et les règles RNF-P1 à P5.',
+        detail: 'The four defining choices, the pipeline and the RNF-P1 to P5 rules.',
       },
       {
-        etiquette: 'Validation du modèle',
+        etiquette: 'Model validation',
         href: docDuDepot('docs/VALIDATION-MODELE.md'),
-        detail: 'Le banc live, le corpus, chaque copie et sa latence : la source des chiffres.',
+        detail: 'The live bench, the corpus, each paper and its latency: the source of the figures.',
       },
     ],
   },
 ]
 
-/** Section 7 : sortir de l’écran — démo, dépôt, documents. */
+/** Section 7: leaving the screen — demo, repository, documents. */
 export function SectionLiens() {
   return (
     <Section {...SECTIONS.liens}>
       <p className="text-sm text-muet">
-        Les juges parcourent le site : voici les trois endroits où le projet se vérifie vraiment.
+        Judges browse the site: here are the three places where the project can really be verified.
       </p>
       {GROUPES.map((groupe) => (
         <div key={groupe.titre} className="space-y-2">

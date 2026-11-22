@@ -1,11 +1,11 @@
 /**
- * Agrégation du profil d'erreur (étape 5 du pipeline) — logique pure, testée.
+ * Error-profile aggregation (pipeline step 5) — pure, tested logic.
  *
- * Règles (RATURE.md §17) :
- *  - une faute = exactement un type ;
- *  - E99 « non typée » est exclue du profil ;
- *  - E11 « recopie » est signalée mais pondérée à 0 ;
- *  - le profil ne connaît que des compteurs : aucune image, aucun nom.
+ * Rules (REVISION.md §17):
+ *  - one error = exactly one type;
+ *  - E99 "untyped" is excluded from the profile;
+ *  - E11 "copying" is reported but weighted 0;
+ *  - the profile only knows counters: no image, no name.
  */
 import { CODES_ERREUR, CODE_NON_TYPEE, entreDansLeProfil, estPonderee, libelleDe } from './taxonomy'
 import type { CodeErreur } from './taxonomy'
@@ -18,18 +18,18 @@ export function profilVide(): Profil {
   return { parType, totalAnalyses: 0, evolution: [], signalees: {} }
 }
 
-/** Applique un diagnostic au profil sans jamais muter l'entrée. */
+/** Applies a diagnosis to the profile without ever mutating the input. */
 export function agreger(profil: Profil, diagnostic: Diagnostic): Profil {
-  // Un historique local peut être abîmé (quota navigateur, version antérieure,
-  // écriture interrompue) : un diagnostic illisible est ignoré, jamais levé.
+  // A local history can be damaged (browser quota, older version,
+  // interrupted write): an unreadable diagnosis is ignored, never thrown.
   if (!diagnostic || !Array.isArray(diagnostic.erreurs)) return profil
 
   const parType = { ...profil.parType }
   const signalees = { ...profil.signalees }
 
   for (const erreur of diagnostic.erreurs) {
-    // Toute faute est signalée (honnêteté), mais seules les pondérées comptent
-    // dans le profil : E99 « non typée » et E11 « recopie » restent à 0.
+    // Every error is reported (honesty), but only weighted ones count in the
+    // profile: E99 "untyped" and E11 "copying" stay at 0.
     signalees[erreur.code] = (signalees[erreur.code] ?? 0) + 1
     if (entreDansLeProfil(erreur.code) && estPonderee(erreur.code)) {
       parType[erreur.code] = (parType[erreur.code] ?? 0) + 1
@@ -51,7 +51,7 @@ export function totalPondere(profil: Profil): number {
   return CODES_ERREUR.reduce((somme, code) => somme + (profil.parType[code] ?? 0), 0)
 }
 
-/** Type dominant = plus fort compteur pondéré ; null si le profil est vide. */
+/** Dominant type = highest weighted counter; null if the profile is empty. */
 export function typeDominant(profil: Profil): CodeErreur | null {
   let meilleur: CodeErreur | null = null
   let max = 0
@@ -65,7 +65,7 @@ export function typeDominant(profil: Profil): CodeErreur | null {
   return meilleur
 }
 
-/** Part du type dans le total pondéré, 0..1. */
+/** Share of the type in the weighted total, 0..1. */
 export function partDuType(profil: Profil, code: CodeErreur): number {
   const total = totalPondere(profil)
   if (total === 0) return 0
@@ -77,8 +77,8 @@ export function pourcentage(part: number): number {
 }
 
 /**
- * Phrase de synthèse affichée dans la vue Profil :
- * « 62 % de tes erreurs : signe perdu au développement ».
+ * Summary sentence displayed in the Profile view:
+ * "62% of your mistakes: lost sign when expanding".
  */
 export function phraseSynthese(profil: Profil): string {
   const dominant = typeDominant(profil)
@@ -87,7 +87,7 @@ export function phraseSynthese(profil: Profil): string {
   return `${part}% of your mistakes: ${libelleDe(dominant).toLowerCase()}`
 }
 
-/** Série triée par fréquence décroissante, pour les barres de la vue Profil. */
+/** Series sorted by decreasing frequency, for the Profile view bars. */
 export function classement(profil: Profil): { code: CodeErreur; n: number; part: number }[] {
   const total = totalPondere(profil)
   return CODES_ERREUR.map((code) => ({
@@ -99,7 +99,7 @@ export function classement(profil: Profil): { code: CodeErreur; n: number; part:
     .sort((a, b) => b.n - a.n)
 }
 
-/** Évolution lisible : nombre de copies où ce type était dominant. */
+/** Readable evolution: number of papers where this type was dominant. */
 export function occurrencesDominantes(profil: Profil, code: CodeErreur): number {
   return profil.evolution.filter((e) => e.typeDominant === code).length
 }

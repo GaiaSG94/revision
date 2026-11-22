@@ -4,7 +4,7 @@ import { BadgeCode } from './BadgeCode'
 
 type Props = { code: CodeErreur; compact?: boolean }
 
-/** Bloc pédagogique d'un type : pourquoi, geste, exemple faux/juste, piège. */
+/** Teaching block for a type: why, the move, wrong/right example, trap. */
 export function ExplicationType({ code, compact = false }: Props) {
   const explication = explicationDe(code)
   if (!explication) {

@@ -1,12 +1,11 @@
 /**
- * Étape 4 bis — seconde passe sur les fautes peu sûres (lot 3).
+ * Step 4b — second pass on uncertain errors (batch 3).
  *
- * Le risque que le cahier des charges qualifie de fatal est le faux positif :
- * un Raturé qui invente des fautes détruit la confiance. Le seuil de 0,6 écarte
- * les réponses franchement douteuses, mais laisse passer une faute typée à 0,7
- * sur une annotation ambiguë. D'où cette relecture : un second appel, **texte
- * seul** (donc rapide et peu coûteux), qui confirme, reclasse ou rétrograde en
- * E99 — sans jamais ajouter de faute.
+ * The risk the spec calls fatal is the false positive: a Revision that invents
+ * errors destroys trust. The 0.6 threshold rules out plainly doubtful answers,
+ * but lets through an error typed at 0.7 on an ambiguous annotation. Hence this
+ * re-read: a second call, **text only** (so fast and cheap), which confirms,
+ * reclassifies or downgrades to E99 — never adding an error.
  */
 import promptMd from '../../prompts/revue.md?raw'
 import { MAX_FAUTES_A_REVOIR, SEUIL_REVUE } from '../domain/config'
@@ -23,12 +22,12 @@ export const PROMPT_REVUE = promptMd.replace('{{TAXONOMIE}}', blocTaxonomie())
 
 export type ResultatRevue = { erreurs: Erreur[]; revues: number; modifiees: number }
 
-/** Une faute est à revoir si elle est typée mais sous le seuil de revue. */
+/** An error needs review if it is typed but below the review threshold. */
 export function aRevoir(erreur: Erreur): boolean {
   return erreur.code !== 'E99' && erreur.confiance > 0 && erreur.confiance < SEUIL_REVUE
 }
 
-/** Indices à revoir, les moins sûrs d'abord, bornés pour tenir la latence. */
+/** Indices to review, least certain first, capped to keep latency bounded. */
 export function indicesASurveiller(erreurs: Erreur[]): number[] {
   return erreurs
     .map((erreur, index) => ({ index, erreur }))
@@ -42,15 +41,15 @@ export function messageRevue(erreurs: Erreur[], indices: number[]): string {
   const lignes = indices.map((index, position) => {
     const erreur = erreurs[index]!
     return [
-      `${position}. ligne : ${erreur.ligne}`,
-      `   code proposé : ${erreur.code} (${libelleDe(erreur.code)}), confiance ${erreur.confiance.toFixed(2)}`,
-      `   explication proposée : ${erreur.explication}`,
+      `${position}. line: ${erreur.ligne}`,
+      `   proposed code: ${erreur.code} (${libelleDe(erreur.code)}), confidence ${erreur.confiance.toFixed(2)}`,
+      `   proposed explanation: ${erreur.explication}`,
     ].join('\n')
   })
-  return ['Fautes à revérifier, dans cet ordre :', '', lignes.join('\n')].join('\n')
+  return ['Errors to re-check, in this order:', '', lignes.join('\n')].join('\n')
 }
 
-/** Applique les verdicts : seuls les indices demandés peuvent changer. */
+/** Applies the verdicts: only the requested indices may change. */
 export function appliquerRevue(
   erreurs: Erreur[],
   indices: number[],
@@ -87,7 +86,7 @@ export async function revoirFautesPeuSures(
     system: PROMPT_REVUE,
     user: messageRevue(erreurs, indices),
     json: true,
-    temperature: 0,
+    temperevision: 0,
     maxTokens: 600,
   })
   const { erreurs: revues, modifiees } = appliquerRevue(erreurs, indices, parserRevue(texte))

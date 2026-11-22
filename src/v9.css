@@ -1,54 +1,54 @@
 /*
- * V9 — accueil corrigé (maquette Design/rature/accueil-v9.html) :
- *   A) hero : trois boutons sur une ligne, titre mot à mot, « moves » en ambre ;
- *   B) écran « Sample papers » ;
- *   C) bloc de droite = duo C1 (scan live) puis C5 (téléphone).
+ * V9 — corrected home (Design/revision/accueil-v9.html mockup):
+ *   A) hero: three buttons on one line, word-by-word title, "moves" in amber;
+ *   B) "Sample papers" screen;
+ *   C) right-hand block = C1 duo (live scan) then C5 (phone).
  *
- * Tokens repris de styles.css : bleu #2337f0, ambre #f2a516, menthe #43d18c,
- * rose #ff9fd4, Archivo 900 / Archivo Narrow, sticker = contour 3px + ombre dure.
- * Pas de rouge, pas de note globale : l'ambre est le diagnostic, le vert la
- * maîtrise. `prefers-reduced-motion` est coupé globalement dans styles.css.
+ * Tokens taken from styles.css: blue #2337f0, amber #f2a516, mint #43d18c,
+ * pink #ff9fd4, Archivo 900 / Archivo Narrow, sticker = 3px outline + hard shadow.
+ * No red, no overall grade: amber is the diagnosis, green is mastery.
+ * `prefers-reduced-motion` is cut globally in styles.css.
  */
 
 /* ---------- A · Hero ---------- */
 
-.errata-titre-mot {
+.revision-titre-mot {
   display: inline-block;
-  animation: errata-monter 700ms cubic-bezier(0.2, 0.9, 0.2, 1.2) both;
+  animation: revision-monter 700ms cubic-bezier(0.2, 0.9, 0.2, 1.2) both;
 }
 
-.errata-titre-mot:nth-child(2) { animation-delay: 60ms; }
-.errata-titre-mot:nth-child(3) { animation-delay: 120ms; }
-.errata-titre-mot:nth-child(4) { animation-delay: 180ms; }
-.errata-titre-mot:nth-child(5) { animation-delay: 260ms; }
+.revision-titre-mot:nth-child(2) { animation-delay: 60ms; }
+.revision-titre-mot:nth-child(3) { animation-delay: 120ms; }
+.revision-titre-mot:nth-child(4) { animation-delay: 180ms; }
+.revision-titre-mot:nth-child(5) { animation-delay: 260ms; }
 
-@keyframes errata-monter {
+@keyframes revision-monter {
   from {
     opacity: 0;
     transform: translateY(2.5rem) rotate(-3deg);
   }
 }
 
-.errata-moves {
+.revision-moves {
   color: var(--color-ambre);
   font-style: normal;
   text-transform: inherit;
 }
 
-.errata-ctas {
+.revision-ctas {
   display: flex;
   flex-wrap: nowrap;
   gap: 0.6rem;
   margin-top: 1.6rem;
 }
 
-.errata-ctas > * {
+.revision-ctas > * {
   flex: 1 1 auto;
   white-space: nowrap;
 }
 
 @media (max-width: 640px) {
-  .errata-ctas {
+  .revision-ctas {
     flex-direction: column;
     align-items: stretch;
   }
@@ -56,7 +56,7 @@
 
 /* ---------- C · Bloc de droite (duo C1 → C5) ---------- */
 
-.errata-duo {
+.revision-duo {
   position: relative;
   min-height: 26rem;
   padding: 1.1rem;
@@ -67,14 +67,14 @@
   color: var(--color-texte);
 }
 
-.errata-duo-onglets {
+.revision-duo-onglets {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 0.8rem;
 }
 
-.errata-duo-onglet {
+.revision-duo-onglet {
   position: relative;
   overflow: hidden;
   padding: 0.35rem 0.75rem;
@@ -90,12 +90,12 @@
   transition: opacity 300ms ease, background 300ms ease;
 }
 
-.errata-duo-onglet.est-actif {
+.revision-duo-onglet.est-actif {
   opacity: 1;
   background: var(--color-jaune-doux);
 }
 
-.errata-duo-onglet i {
+.revision-duo-onglet i {
   position: absolute;
   left: 0;
   bottom: 0;
@@ -106,17 +106,17 @@
   transform-origin: left;
 }
 
-.errata-duo-onglet.est-actif i {
-  animation: errata-jauge 6500ms linear forwards;
+.revision-duo-onglet.est-actif i {
+  animation: revision-jauge 6500ms linear forwards;
 }
 
-@keyframes errata-jauge {
+@keyframes revision-jauge {
   to {
     transform: scaleX(1);
   }
 }
 
-.errata-duo-scene {
+.revision-duo-scene {
   position: absolute;
   inset: 3.4rem 1.1rem 1.1rem;
   opacity: 0;
@@ -125,14 +125,14 @@
   pointer-events: none;
 }
 
-.errata-duo-scene.est-active {
+.revision-duo-scene.est-active {
   opacity: 1;
   transform: none;
 }
 
 /* --- C1 · Scan live --- */
 
-.errata-scan-labo {
+.revision-scan-labo {
   display: flex;
   justify-content: space-between;
   gap: 0.5rem;
@@ -144,7 +144,7 @@
   text-transform: uppercase;
 }
 
-.errata-scan-papier {
+.revision-scan-papier {
   position: relative;
   height: 15.5rem;
   overflow: hidden;
@@ -156,7 +156,7 @@
     repeating-linear-gradient(transparent 0 25px, rgb(80 130 200 / 35%) 25px 26px);
 }
 
-.errata-scan-ligne {
+.revision-scan-ligne {
   padding: 0.45rem 0.6rem 0.45rem 2.5rem;
   color: #1d2f6f;
   font-family: "Nanum Pen Script", cursive;
@@ -165,35 +165,35 @@
   white-space: nowrap;
 }
 
-.errata-scan-ligne sup {
+.revision-scan-ligne sup {
   font-size: 0.6em;
   line-height: 0;
 }
 
-.errata-scan-faisceau {
+.revision-scan-faisceau {
   position: absolute;
   left: 0;
   right: 0;
   height: 2.9rem;
   border-bottom: 2px solid var(--color-menthe);
   background: linear-gradient(180deg, transparent, rgb(67 209 140 / 35%), transparent);
-  animation: errata-balayage 3.6s ease-in-out infinite;
+  animation: revision-balayage 3.6s ease-in-out infinite;
 }
 
-@keyframes errata-balayage {
+@keyframes revision-balayage {
   0% { top: -2.9rem; }
   60%, 100% { top: 100%; }
 }
 
-.errata-scan-cadre {
+.revision-scan-cadre {
   position: absolute;
   border: 3px solid var(--color-ambre);
   border-radius: 6px;
   background: rgb(242 165 22 / 15%);
-  animation: errata-pop 400ms ease both;
+  animation: revision-pop 400ms ease both;
 }
 
-.errata-scan-cadre .sticker {
+.revision-scan-cadre .sticker {
   position: absolute;
   top: -1rem;
   right: -0.75rem;
@@ -201,38 +201,38 @@
   font-size: 0.68rem;
 }
 
-@keyframes errata-pop {
+@keyframes revision-pop {
   from {
     opacity: 0;
     transform: scale(0.6);
   }
 }
 
-.errata-scan-etapes {
+.revision-scan-etapes {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
   margin-top: 0.8rem;
 }
 
-.errata-scan-etapes span {
+.revision-scan-etapes span {
   padding: 0.2rem 0.55rem;
   border: 2px solid var(--color-texte);
   border-radius: 999px;
   background: white;
   font-family: var(--font-lecture);
   font-size: 0.68rem;
-  animation: errata-allume 3.6s infinite;
+  animation: revision-allume 3.6s infinite;
 }
 
-@keyframes errata-allume {
+@keyframes revision-allume {
   0%, 10% { background: white; }
   20%, 100% { background: var(--color-menthe); }
 }
 
-/* --- C5 · Téléphone --- */
+/* --- C5 · Phone --- */
 
-.errata-tel {
+.revision-tel {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 1.2rem;
@@ -240,14 +240,14 @@
 }
 
 @media (max-width: 560px) {
-  .errata-tel {
+  .revision-tel {
     grid-template-columns: 1fr;
   }
 }
 
-.errata-tel-appareil {
+.revision-tel-appareil {
   position: relative;
-  /* doit tenir dans la scène du bloc (26rem − onglets − marges ≈ 21,5rem) */
+  /* must fit in the block's scene (26rem − tabs − margins ≈ 21.5rem) */
   width: 12.5rem;
   height: 19rem;
   margin: 0 auto;
@@ -259,7 +259,7 @@
   box-shadow: 6px 6px 0 var(--color-texte);
 }
 
-.errata-tel-encoche {
+.revision-tel-encoche {
   width: 4.2rem;
   height: 0.9rem;
   margin: -0.85rem auto 0.6rem;
@@ -267,7 +267,7 @@
   background: var(--color-texte);
 }
 
-.errata-tel-carte {
+.revision-tel-carte {
   margin-bottom: 0.6rem;
   padding: 0.6rem;
   border: 2px solid var(--color-texte);
@@ -276,34 +276,34 @@
   box-shadow: 3px 3px 0 var(--color-texte);
 }
 
-.errata-tel-push {
+.revision-tel-push {
   background: var(--color-jaune-doux);
-  animation: errata-glisser 4s ease-in-out infinite;
+  animation: revision-glisser 4s ease-in-out infinite;
 }
 
-@keyframes errata-glisser {
+@keyframes revision-glisser {
   0% { transform: translateY(-120%); }
   12%, 85% { transform: none; }
   100% { transform: translateY(-120%); }
 }
 
-.errata-tel-push b {
+.revision-tel-push b {
   display: block;
   font-size: 0.72rem;
 }
 
-.errata-tel-push small {
+.revision-tel-push small {
   font-size: 0.68rem;
 }
 
-.errata-tel-question {
+.revision-tel-question {
   margin: 0.25rem 0 0.5rem;
   font-family: var(--font-italique);
   font-size: 1.1rem;
   font-style: italic;
 }
 
-.errata-tel-reponse {
+.revision-tel-reponse {
   padding: 0.35rem 0.5rem;
   border: 2px dashed #999;
   border-radius: 0.5rem;
@@ -312,20 +312,20 @@
   font-size: 1.25rem;
 }
 
-.errata-tel-reponse span {
+.revision-tel-reponse span {
   display: inline-block;
   overflow: hidden;
   white-space: nowrap;
   border-right: 2px solid #1d2f6f;
-  animation: errata-ecrire 4s steps(18) infinite;
+  animation: revision-ecrire 4s steps(18) infinite;
 }
 
-@keyframes errata-ecrire {
+@keyframes revision-ecrire {
   0% { width: 0; }
   50%, 100% { width: 10.5em; }
 }
 
-.errata-tel-ok {
+.revision-tel-ok {
   display: inline-block;
   margin-top: 0.5rem;
   padding: 0.15rem 0.45rem;
@@ -333,15 +333,15 @@
   border-radius: 0.4rem;
   background: var(--color-menthe);
   font-size: 0.72rem;
-  animation: errata-accoche 4s infinite;
+  animation: revision-accoche 4s infinite;
 }
 
-@keyframes errata-accoche {
+@keyframes revision-accoche {
   0%, 55% { opacity: 0; transform: scale(0.6); }
   62%, 100% { opacity: 1; transform: none; }
 }
 
-.errata-tel-etapes {
+.revision-tel-etapes {
   margin: 0;
   padding: 0;
   list-style: none;
@@ -350,14 +350,14 @@
   gap: 0.7rem;
 }
 
-.errata-tel-etapes li {
+.revision-tel-etapes li {
   display: flex;
   gap: 0.6rem;
   align-items: flex-start;
   font-size: 0.85rem;
 }
 
-.errata-tel-etapes i {
+.revision-tel-etapes i {
   flex: none;
   padding: 0.1rem 0.4rem;
   border: 2px solid var(--color-texte);
@@ -368,9 +368,9 @@
   font-weight: 700;
 }
 
-/* ---------- B · Écran Sample papers ---------- */
+/* ---------- B · Sample papers screen ---------- */
 
-.errata-retour {
+.revision-retour {
   display: inline-block;
   margin-bottom: 0.75rem;
   font-size: 0.8rem;
@@ -379,7 +379,7 @@
   text-underline-offset: 4px;
 }
 
-.errata-exemples-grille {
+.revision-exemples-grille {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1.2rem;
@@ -387,18 +387,18 @@
 }
 
 @media (max-width: 900px) {
-  .errata-exemples-grille {
+  .revision-exemples-grille {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 560px) {
-  .errata-exemples-grille {
+  .revision-exemples-grille {
     grid-template-columns: 1fr;
   }
 }
 
-.errata-exemple {
+.revision-exemple {
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -409,56 +409,56 @@
   transition: transform 200ms ease, box-shadow 200ms ease;
 }
 
-.errata-exemple:hover:not(:disabled) {
+.revision-exemple:hover:not(:disabled) {
   transform: translate(-2px, -3px) rotate(-0.6deg);
   box-shadow: 6px 6px 0 var(--color-texte);
 }
 
-.errata-exemple:disabled {
+.revision-exemple:disabled {
   opacity: 0.55;
   cursor: wait;
 }
 
-.errata-exemple figure {
+.revision-exemple figure {
   position: relative;
   height: 11rem;
   border-bottom: 3px solid var(--color-texte);
   background: #7a5a3c center/cover no-repeat;
 }
 
-.errata-exemple figure .sticker {
+.revision-exemple figure .sticker {
   position: absolute;
   left: 0.6rem;
   top: 0.6rem;
   font-size: 0.68rem;
 }
 
-.errata-exemple figure img {
+.revision-exemple figure img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: top;
 }
 
-.errata-exemple .corps {
+.revision-exemple .corps {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
   padding: 0.75rem 0.85rem 0.9rem;
 }
 
-.errata-exemple .corps b {
+.revision-exemple .corps b {
   font-size: 1rem;
   letter-spacing: -0.01em;
 }
 
-.errata-exemple .corps span {
+.revision-exemple .corps span {
   color: var(--color-muet);
   font-size: 0.8rem;
   line-height: 1.35;
 }
 
-.errata-exemple-action {
+.revision-exemple-action {
   align-self: flex-start;
   margin-top: 0.4rem;
   padding: 0.45rem 0.8rem;
@@ -469,10 +469,10 @@
   font-weight: 800;
 }
 
-.errata-exemple-action-menthe {
+.revision-exemple-action-menthe {
   background: var(--color-menthe);
 }
 
-.errata-exemple-action-blanc {
+.revision-exemple-action-blanc {
   background: white;
 }

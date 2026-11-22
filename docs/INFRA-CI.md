@@ -1,100 +1,97 @@
-# Infra CI de Raturé — runners, file Mergify, agents en cas de conflit
+# Revision CI infrastructure — runners, Mergify queue, conflict agents
 
-> Fiche d'exploitation. Ce dépôt n'a **aucune** machine dédiée : ses runners
-> sont quatre runners self-hosted qui ne servaient plus ailleurs, déplacés ici
-> le 2026-11-11 (voir §1). La CI rend son verdict en moins de 5 minutes.
+> Operations note. This repository has **no dedicated machine**: its runners are self-hosted
+> runners that were no longer in use elsewhere and were moved here on 2026-11-11 (see §1). CI
+> gives its verdict in under 5 minutes.
 
-## 1. Les runners viennent d'ailleurs (déplacement, pas création)
+## 1. The runners came from elsewhere (moved, not created)
 
-Le r630 était à **91 % de disque** : créer des runners neufs (≈ 5 Go chacun)
-était exclu. On a donc **déplacé** des runners existants avec
-`deplace-runner.sh` (kit `repo-bootstrap`), qui réutilise le dossier
-(réenregistrement seul, `_work/` vidé, symlinks réparés).
+The r630 was at **91% disk** usage: creating new runners (≈ 5 GB each) was out of the question.
+Existing runners were therefore **moved** with `deplace-runner.sh` (from the `repo-bootstrap`
+kit), which reuses the folder (re-registration only, `_work/` emptied, symlinks repaired).
 
-| Runner | Origine | État au 12/11 01 h |
+| Runner | Origin | Status as of 12 Nov, 01:00 |
 |---|---|---|
-| `r630-rature-01` | créé par la fabrique | online |
-| `r630-rature-02` | déplacé depuis `actions-runner-stable-02` (dépôt `stable` supprimé, enregistrement orphelin) | online |
-| `r630-rature-03` | créé par la fabrique | online |
+| `r630-revision-01` | created by the factory | online |
+| `r630-revision-02` | moved from `actions-runner-stable-02` (deleted `stable` repository, orphan registration) | online |
+| `r630-revision-03` | created by the factory | online |
 
-**Historique du 11/11** : quatre runners avaient été déplacés le soir même
-(`stable-01`, `stable-02` — dépôt supprimé —, `near_tidewater-01`,
-`deja-vu-ci-01`, tous deux sans PR ouverte). Trois dossiers ont ensuite disparu
-lors d'un ménage de disque lancé par un autre agent sur le r630 (le volume est
-passé de 91 % à 49 % d'occupation) ; leurs unités systemd restaient en boucle de
-redémarrage (`status=203/EXEC`, exécutable absent). Unités supprimées, puis
-deux runners recréés par la fabrique (`fabrique-repo.sh --sans-socle
---workers 3`), avec un `systemctl --user restart` nécessaire pour qu'ils
-passent `online` (les runners neufs démarrent parfois « sourds »).
+**History of 11 Nov:** four runners had been moved that same evening (`stable-01`, `stable-02` —
+the repository was deleted —, `near_tidewater-01`, `deja-vu-ci-01`, both without an open PR). Three
+folders then disappeared during a disk cleanup started by another agent on the r630 (the volume
+went from 91% to 49% used); their systemd units were stuck in a restart loop (`status=203/EXEC`,
+executable missing). The units were removed, then two runners were recreated by the factory
+(`fabrique-repo.sh --sans-socle --workers 3`), with a `systemctl --user restart` needed to bring
+them `online` (new runners sometimes start "deaf").
 
-Labels : `self-hosted`, `Linux`, `X64`, `rature-worker`, `ci-node`.
-Services : unités systemd **utilisateur** `actions-runner-rature-0N.service`
-(`Restart=always`), donc pas de `sudo` nécessaire.
+Labels: `self-hosted`, `Linux`, `X64`, `revision-worker`, `ci-node`.
+Services: **user** systemd units `actions-runner-revision-0N.service` (`Restart=always`), so no
+`sudo` is needed.
 
-Vérifier l'état :
+Check status:
 
 ```bash
-gh api repos/GaiaSG94/errata/actions/runners \
-  --jq '[.runners[] | select(.status=="online")] | length'   # attendu : 3
-export XDG_RUNTIME_DIR=/run/user/$(id -u)                    # sinon systemctl --user échoue
-systemctl --user list-units 'actions-runner-rature*' --all
+gh api repos/GaiaSG94/revision/actions/runners \
+  --jq '[.runners[] | select(.status=="online")] | length'   # expected: 3
+export XDG_RUNTIME_DIR=/run/user/$(id -u)                    # otherwise systemctl --user fails
+systemctl --user list-units 'actions-runner-revision*' --all
 ```
 
-Un runner `offline` juste après enregistrement se soigne par
-`systemctl --user restart actions-runner-rature-0N.service` (constaté deux fois).
+A runner that is `offline` just after registration is fixed with
+`systemctl --user restart actions-runner-revision-0N.service` (observed twice).
 
-## 2. Ce que la CI exige (trois checks, pas un de plus)
+## 2. What CI requires (three checks, no more)
 
-| Check | Rôle | Budget |
+| Check | Role | Budget |
 |---|---|---|
-| `ci` | typecheck strict, tests, build, taille des fichiers/fonctions, tests des gardes | ≤ 5 min |
-| `ci-budget` | garde-fou de configuration : aucun job ne déclare plus de 5 min | quelques secondes |
-| `couche0` | périmètre déclaré (`## Scope` en puces) + motifs interdits (pas de secret, pas de push forcé) | ~17 s |
+| `ci` | strict typecheck, tests, build, file/function size, guard tests | ≤ 5 min |
+| `ci-budget` | configuration guard: no job declares more than 5 minutes | a few seconds |
+| `couche0` | declared scope (`## Scope` bullets) + forbidden patterns (no secret, no force push) | ~17 s |
 
-Le ruleset de `main` impose une PR, un historique linéaire et ces trois
-checks ; `enforce_admins` équivalent via le ruleset, donc **aucun push direct**,
-même pour un agent.
+The `main` ruleset requires a PR, a linear history and these three checks; the equivalent of
+`enforce_admins` is handled by the ruleset, so there are **no direct pushes**, not even by an
+agent.
 
-## 3. File Mergify
+## 3. Mergify queue
 
-`.mergify.yml` : `queue_rules.default` (les 3 checks verts, pas de conflit, pas
-de brouillon, base `main`), `merge_method: rebase`, lots de 1 à 3,
-`max_parallel_checks: 2` pour quatre workers. Le produit *Merge Queue* est
-activé par API (`PUT /v1/products/GaiaSG94/errata` → 204) et
-`merge_protections` avec `auto_merge_conditions: true`, donc une PR verte
-s'embarque **sans commentaire**.
+`.mergify.yml`: `queue_rules.default` (all 3 checks green, no conflict, not a draft, base `main`),
+`merge_method: rebase`, batches of 1 to 3,
+`max_parallel_checks: 2` for four workers. The *Merge Queue* product was enabled through the API
+(`PUT /v1/products/GaiaSG94/revision` → 204) and `merge_protections` with
+`auto_merge_conditions: true`, so a green PR merges **without a comment**.
 
-Frein manuel : étiquette `hold` (à poser sur la PR). Priorités : `urgent` /
-`priority-low`.
+Manual brake: the `hold` label (put it on the PR). Priorities: `urgent` / `priority-low`.
 
-## 4. Agents en cas de conflit — sur InferHub
+## 4. Conflict agents — on InferHub
 
-Le balayeur `pr-auto-merge` traite les PR `DIRTY` (conflit) et `BEHIND`
-(retard) : rebase, et si le rebase bute sur un conflit, il appelle
-`.github/fireworks/conflict_agent.py` (résolution conflit par conflit, porte de
-compilation avant push, `quota.py` pour borner les saisines).
+The `pr-auto-merge` sweep handles `DIRTY` (conflict) and `BEHIND` PRs: it rebases, and if the
+rebase hits a conflict it calls `.github/fireworks/conflict_agent.py` (file-by-file resolution,
+compilation gate before pushing, `quota.py` to bound invocations).
 
-Ces agents sont **branchés sur InferHub** (API [OI]-compatible), pas sur un
-fournisseur tiers :
+These agents are **connected to InferHub** (an [OI]-compatible API), not to a third-party
+provider:
 
-| Réglage | Valeur |
+| Setting | Value |
 |---|---|
-| secret `FIREWORKS_API_KEY` | clé InferHub |
+| secret `FIREWORKS_API_KEY` | InferHub key |
 | variable `FIREWORKS_BASE_URL` | `https://api.inferhub.dev/v1/chat/completions` |
 | variable `FIREWORKS_MODEL` | `ag/gemini-3.8-flash-high` |
-| variable `FIREWORKS_AGENT_RESOLVE` | `1` (coupe-circuit : `0`) |
+| variable `FIREWORKS_AGENT_RESOLVE` | `1` (circuit breaker: `0`) |
 
-Le nom `fireworks` est historique (le code et ses tests datent de ce
-fournisseur) ; seul l'amont change, le contrat HTTP est celui d'InferHub.
+The name `fireworks` is historical (the code and its tests date from that provider); only the
+upstream changed, the HTTP contract is InferHub's.
 
-Le même modèle sert au produit lui-même (`src/domain/config.ts`), mais par le
-proxy edge, avec une clé qui ne descend **jamais** dans le bundle.
+The same model serves the product itself (`src/domain/config.ts`), but through the edge proxy,
+with a key that never reaches the bundle.
 
-## 5. Déploiement
+## 5. Deployment
 
-`pages.yml` construit la webapp statique et la publie automatiquement sur GitHub Pages (déploiement vérifié le 11 novembre, 6db57e8)
-(`https://gaiasg94.github.io/errata/`) à chaque push sur `main` — public,
-HTTPS, gratuit, sans jeton. La clé InferHub n'y est pas : le site parle au
-proxy edge (`/api/analyze`, voir `api/analyze.ts` et la variante
-`worker/worker.js`) ou, à défaut, en **BYOK** (l'utilisateur colle sa clé) ou
-en **mode démo** (réponses enregistrées sur le corpus).
+`pages.yml` builds the static webapp and publishes it automatically to GitHub Pages (deployment
+verified on 11 November, commit 6db57e8) (`https://gaiasg94.github.io/revision/`) on every push to
+`main` — public, HTTPS, free, tokenless. The InferHub key is not there: the site talks to the edge
+proxy (`/api/analyze`, see `api/analyze.ts` and the `worker/worker.js` variant), or otherwise uses
+**BYOK** (the user pastes a key) or **demo mode** (recorded answers from the corpus).
+
+> Status note: this is the configuration and the historical verification record. The current
+> public availability of the rebranded URL is checked in [`../DEMO.md`](../DEMO.md); no live URL
+> is guaranteed by this document.

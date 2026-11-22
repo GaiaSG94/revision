@@ -1,15 +1,15 @@
 /**
- * Banque d'exercices locale — idée 1 du brassage « rester sur InferHub ».
+ * Local exercise bank — idea 1 from the "stay on InferHub" brainstorm.
  *
- * Pourquoi : générer un exercice coûte **deux** appels réseau (génération +
- * garde-fou), sur un amont qui met 16 à 57 s par appel. Ces 36 exercices sont
- * écrits à la main, ciblés sur le geste exact de chaque type, et leur pertinence
- * est vérifiée par construction (puis par `tests/banque.test.ts`). L'étape 6
- * devient donc **instantanée et hors ligne** ; l'appel modèle ne sert plus que
- * pour un « exercice inédit » demandé explicitement.
+ * Why: generating an exercise costs **two** network calls (generation +
+ * safety check), on an upstream that takes 16 to 57 s per call. These 36
+ * exercises are hand-written, targeting the exact move for each type, and their
+ * relevance is verified by construction (then by `tests/banque.test.ts`). Step 6
+ * therefore becomes **instant and offline**; the model call is now only used
+ * for an explicitly requested "fresh exercise".
  *
- * Énoncés en anglais (le produit est en anglais). Chaque énoncé fait faire le
- * geste décrit par la `signature` du code dans `taxonomy.ts`.
+ * Prompts are in English (the product is in English). Each prompt makes the
+ * student perform the move described by the code's `signature` in `taxonomy.ts`.
  */
 import { CODES_ERREUR, libelleDe } from './taxonomy'
 import type { Exercice, ExerciceVerifie, VerdictGardeFou } from './types'
@@ -24,11 +24,11 @@ export type ExerciceBanque = {
   enonce: string
   indices: string[]
   solution: string
-  /** L'erreur que cet exercice tend — c'est elle qui le rend ciblé. */
+  /** The error this exercise targets — that is what makes it targeted. */
   piege: string
 }
 
-/** Verdict de garde-fou : la banque est écrite pour le type, il est vérifié par les tests. */
+/** Safety-check verdict: the bank is written for the type, and the tests verify it. */
 const VERDICT_BANQUE: VerdictGardeFou = {
   travailleLeBonType: true,
   neDonneLaSolutionOrigine: true,
@@ -119,9 +119,9 @@ export function exercicesDe(code: string): ExerciceBanque[] {
 }
 
 /**
- * Choisit un exercice du type visé. Déterministe à options égales : la graine
- * (par défaut l'horodatage) ne sert qu'à varier d'un tirage à l'autre quand
- * l'élève demande « un autre exercice ».
+ * Picks an exercise of the targeted type. Deterministic for equal options: the
+ * seed (by default the timestamp) only serves to vary from one draw to the next
+ * when the student asks for "another exercise".
  */
 export function exercicePour(
   code: string,
@@ -141,7 +141,7 @@ export function exercicePour(
   return pool[graine % pool.length]
 }
 
-/** Convertit en `ExerciceVerifie` : tentative 0 signale « vient de la banque ». */
+/** Converts to `ExerciceVerifie`: attempt 0 signals "comes from the bank". */
 export function exerciceVerifie(exercice: ExerciceBanque): ExerciceVerifie {
   const exerciceProduit: Exercice = {
     enonce: exercice.enonce,
@@ -156,7 +156,7 @@ export function exerciceVerifie(exercice: ExerciceBanque): ExerciceVerifie {
   return { exercice: exerciceProduit, verdict: VERDICT_BANQUE }
 }
 
-/** Libellé affiché pour signaler l'origine de l'exercice. */
+/** Label displayed to indicate the origin of the exercise. */
 export function origineExercice(exercice: Exercice): string {
   return exercice.tentative === 0
     ? `From the local bank (${libelleDe(exercice.typeTravaille)}) — no network call.`

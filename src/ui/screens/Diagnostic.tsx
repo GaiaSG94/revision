@@ -6,7 +6,7 @@ import { Carte } from '../components/Carte'
 import { CopieAnnotee } from '../components/CopieAnnotee'
 import { ExplicationType } from '../components/ExplicationType'
 import { origineDemo } from '../../pipeline/demo'
-import { useRature } from '../../etat/useRature'
+import { useRature } from '../../etat/useRevision'
 
 function LigneErreur({
   erreur,
@@ -48,7 +48,7 @@ function LigneErreur({
   )
 }
 
-/** Écran 4 : le diagnostic — où travailler, sans jugement. */
+/** Screen 4: the diagnosis — what to work on, without judgement. */
 export function Diagnostic() {
   const { resultat, aller, demoId, progression } = useRature()
   const [selection, setSelection] = useState<number | null>(null)
@@ -69,7 +69,7 @@ export function Diagnostic() {
   const demo = demoId ? origineDemo(demoId) : null
   const msTotal = progression.reduce((somme, etape) => somme + (etape.ms ?? 0), 0)
 
-  /** Clic sur une faute de la liste : sélection + zoom sur sa zone. */
+  /** Click on an error in the list: select it + zoom to its zone. */
   const choisir = (index: number) => {
     setSelection(index)
     const zone = diagnostic.erreurs[index]?.zone

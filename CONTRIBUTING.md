@@ -1,57 +1,57 @@
-# Contribuer
+# Contributing
 
-## Lancer le projet
+## Running the project
 
 ```bash
 npm ci
 npm run dev        # http://localhost:5173
-npm test           # 170 tests, aucun réseau, aucun quota consommé
+npm test           # 170 tests, no network, no quota consumed
 npm run typecheck
 npm run build      # dist/
-node scripts/check-tokens.mjs   # garde de taille des fichiers et fonctions
+node scripts/check-tokens.mjs   # file- and function-size guard
 ```
 
-Node ≥ 20. Aucune dépendance payante.
+Node ≥ 20. No paid dependency.
 
-## Règles de contribution
+## Contribution rules
 
-1. **Jamais de push direct sur `main`** : le ruleset l'impose (PR obligatoire, historique
-   linéaire, trois checks requis).
-2. **Une branche = une PR**, ouverte dans la minute qui suit le push. Une branche mergée ou fermée
-   est supprimée, côté GitHub et en local.
-3. **Le corps de la PR contient un bloc `## Scope`** avec une puce par fichier ou dossier touché
-   (le modèle de PR le fournit). Le garde `couche0` refuse un périmètre non déclaré.
-4. **CI en moins de 5 minutes** : on ne rallonge jamais un `timeout-minutes`. Un job trop long sort
-   des PR.
-5. **Taille** : fichiers < 500 lignes, fonctions < 50 lignes. Au-delà, on découpe.
-6. **Le merge est automatique** : la file Mergify embarque une PR dès que `ci`, `ci-budget` et
-   `couche0` sont verts. Frein manuel : étiquette `hold`. Les conflits de rebase sont résolus par
-   un agent branché sur InferHub (`.github/fireworks/conflict_agent.py`).
+1. **Never push directly to `main`**: the ruleset enforces it (PR required, linear history, three
+   required checks).
+2. **One branch = one PR**, opened within a minute of the push. A merged or closed branch is
+   deleted, both on GitHub and locally.
+3. **The PR body contains a `## Scope` block** with one bullet per touched file or folder (the PR
+   template provides it). The `couche0` guard rejects an undeclared scope.
+4. **CI under 5 minutes**: never increase a `timeout-minutes`. A job that runs too long is moved
+   out of PRs.
+5. **Size**: files < 500 lines, functions < 50 lines. Split anything larger.
+6. **Merging is automatic**: the Mergify queue takes a PR as soon as `ci`, `ci-budget` and
+   `couche0` are green. Manual brake: the `hold` label. Rebase conflicts are resolved by an agent
+   connected to InferHub (`.github/fireworks/conflict_agent.py`).
 
-## Où modifier quoi
+## Where to change what
 
-| Zone | Contenu |
+| Area | Content |
 |---|---|
-| `src/domain/` | Taxonomie, règles du profil, types. **Le cœur métier** : toute règle change ici, jamais dans l'UI |
-| `src/pipeline/` | Les 6 étapes et le client modèle. Aucun appel réseau hors `llm.ts` |
-| `src/ui/` | Écrans et composants. Aucune règle métier |
-| `src/storage/`, `src/export/` | Persistance locale et exports |
-| `prompts/` | Prompts versionnés : extraction, classification, génération, garde-fou |
-| `api/`, `worker/` | Proxy edge. Aucun secret dans le code |
-| `corpus/`, `tests/` | Fixtures et tests. Ajouter un cas d'erreur = ajouter une fixture |
+| `src/domain/` | Taxonomy, profile rules, types. **The business core**: every rule changes here, never in the UI |
+| `src/pipeline/` | The 6 steps and the model client. No network call outside `llm.ts` |
+| `src/ui/` | Screens and components. No business rules |
+| `src/storage/`, `src/export/` | Local persistence and exports |
+| `prompts/` | Versioned prompts: extraction, classification, generation, guardrail |
+| `api/`, `worker/` | Edge proxy. No secret in code |
+| `corpus/`, `tests/` | Fixtures and tests. Adding an error case means adding a fixture |
 
-## Ajouter un type d'erreur
+## Adding an error type
 
-La taxonomie est **fermée** : ajouter un code est une décision produit, pas un ajustement de prompt.
+The taxonomy is **closed**: adding a code is a product decision, not a prompt tweak.
 
-1. Ajouter l'entrée dans `src/domain/taxonomy.ts` (code, libellé, signature) ;
-2. Le prompt de classification se régénère tout seul depuis `TAXONOMIE` (`blocTaxonomie()`) ;
-3. Ajouter une fixture dans `corpus/fixtures.ts` avec sa vérité terrain ;
-4. Vérifier que `npm test` reste vert (RNF-03 ≥ 80 %, RNF-04 = 0 faux positif).
+1. Add the entry in `src/domain/taxonomy.ts` (code, label, signature);
+2. The classification prompt regenerates itself from `TAXONOMIE` (`blocTaxonomie()`);
+3. Add a fixture in `corpus/fixtures.ts` with its ground truth;
+4. Check that `npm test` stays green (RNF-03 ≥ 80%, RNF-04 = 0 false positives).
 
-## Ce qu'on refuse
+## What we refuse
 
-- Correction ou notation automatique de la copie : on diagnostique, on ne note pas.
-- Donner la réponse de l'exercice d'origine.
-- Persister une image, un nom, ou quoi que ce soit côté serveur.
-- Du rouge dans l'interface : le diagnostic est jaune, la progression est verte.
+- Automatic correction or grading of the paper: we diagnose, we do not grade.
+- Giving the answer to the original exercise.
+- Persisting an image, a name, or anything server-side.
+- Red in the interface: the diagnosis is amber, progress is green.

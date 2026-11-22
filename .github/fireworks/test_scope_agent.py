@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests ciblés de scope_agent.py — bibliothèque standard uniquement.
+"""Targeted tests for scope_agent.py — standard library only.
 
 Lance : python3 -m unittest test_scope_agent -v
 (depuis .github/fireworks/).
@@ -27,20 +27,20 @@ def fichier(chemin, ajout="+ligne"):
 
 
 class ReponseTest(unittest.TestCase):
-    """Lecture des puces rendues par le modèle."""
+    """Reading the bullets returned by the model."""
 
     def test_deux_puces(self):
-        texte = ("- `app/A.kt` — ajoute l'écran\n"
-                 "- `docs/X.md` — documente le choix\n")
+        texte = ("- `app/A.kt` — adds the screen\n"
+                 "- `docs/X.md` — documents the choice\n")
         self.assertEqual(scope_agent.raisons_repondue(texte),
-                         {"app/A.kt": "ajoute l'écran",
-                          "docs/X.md": "documente le choix"})
+                         {"app/A.kt": "adds the screen",
+                          "docs/X.md": "documents the choice"})
 
     def test_ignore_les_phrases_autour(self):
-        texte = ("Voici la section :\n\n"
-                 "## Scope\n- `core/B.kt` — corrige le calcul\n\nVoilà.\n")
+        texte = ("Here is the section:\n\n"
+                 "## Scope\n- `core/B.kt` — fixes the calculation\n\nDone.\n")
         self.assertEqual(scope_agent.raisons_repondue(texte),
-                         {"core/B.kt": "corrige le calcul"})
+                         {"core/B.kt": "fixes the calculation"})
 
     def test_tiret_long_et_espace(self):
         self.assertEqual(scope_agent.raisons_repondue("- `a/b.kt` — x"),
@@ -48,14 +48,14 @@ class ReponseTest(unittest.TestCase):
 
 
 class RecomposerTest(unittest.TestCase):
-    """Le corps recomposé doit passer le garde, ou ne pas être écrit."""
+    """The recomposed body must pass the guard, or not be written."""
 
     def setUp(self):
         self.g = garde()
 
     def test_section_absente(self):
         fichiers = [fichier("app/A.kt"), fichier("core/B.kt")]
-        corps = "## Problème\n\nRien ne marche.\n"
+        corps = "## Problem\n\nNothing works.\n"
         nouveau, ajouts, retires = scope_agent.recomposer(
             corps, fichiers, {"app/A.kt": "corrige A", "core/B.kt": "corrige B"},
             self.g)
@@ -65,7 +65,7 @@ class RecomposerTest(unittest.TestCase):
         erreurs = []
         self.g.check_scope(fichiers, nouveau, erreurs)
         self.assertEqual(erreurs, [])
-        self.assertIn("## Problème", nouveau)          # prose conservée
+        self.assertIn("## Problem", nouveau)          # prose kept
 
     def test_exempte_non_declaree(self):
         fichiers = [fichier("app/A.kt"),
@@ -85,7 +85,7 @@ class RecomposerTest(unittest.TestCase):
                  "- `vieux/D.kt` — puce morte\n"
                  "\n## Preuves\n- 11/11\n")
         nouveau, ajouts, retires = scope_agent.recomposer(
-            corps, fichiers, {"app/A.kt": "jamais utilisée",
+            corps, fichiers, {"app/A.kt": "never used",
                               "core/B.kt": "corrige B"}, self.g)
         self.assertEqual([a.split("`")[1] for a in ajouts], ["core/B.kt"])
         self.assertEqual(retires, ["vieux/D.kt"])
@@ -97,7 +97,7 @@ class RecomposerTest(unittest.TestCase):
 
 
 class MessageTest(unittest.TestCase):
-    """Le prompt contient chaque fichier une fois, avec un extrait du diff."""
+    """The prompt contains each file once, with a diff excerpt."""
 
     def test_un_bloc_par_fichier(self):
         fichiers = [fichier("app/A.kt", "+val x = 1"),
@@ -110,11 +110,11 @@ class MessageTest(unittest.TestCase):
 
 
 class RapprocherTest(unittest.TestCase):
-    """Les puces rendues sont rapprochées des fichiers avec la règle du garde.
+    """Returned bullets are matched to files using the guard rule.
 
-    Non-régression 29/10 (#215) : le modèle rendait un glob là où le script
-    exigeait l'égalité exacte → la puce juste comptait comme absente et la PR
-    restait bloquée avec « le modèle n'a rien rendu ».
+    Non-regression 29/10 (#215): the model returned a glob where the script
+    required exact equality → a correct bullet counted as absent and the PR
+    stayed stuck on 'the model returned nothing'.
     """
 
     def setUp(self):
@@ -127,13 +127,13 @@ class RapprocherTest(unittest.TestCase):
         self.assertEqual(manquants, [])
 
     def test_glob_du_modele(self):
-        raisons = {"app/src/main/java/*/app/*Settings*.kt": "lit le lien"}
+        raisons = {"app/src/main/java/*/app/*Settings*.kt": "reads the link"}
         couverts, manquants = scope_agent.rapprocher(
             raisons,
             ["app/src/main/java/dev/sam3vision/app/SettingsScreen.kt"], self.g)
         self.assertEqual(manquants, [])
         self.assertEqual(couverts["app/src/main/java/dev/sam3vision/app/"
-                                  "SettingsScreen.kt"], "lit le lien")
+                                  "SettingsScreen.kt"], "reads the link")
 
     def test_dossier(self):
         couverts, manquants = scope_agent.rapprocher(
@@ -142,20 +142,20 @@ class RapprocherTest(unittest.TestCase):
         self.assertIn("docs/CI-QUEUE.md", couverts)
 
     def test_casse_approximative_du_modele(self):
-        # Vu sur #215 le 29/10 : le modèle a rendu `sam3Vision` (V majuscule)
-        # pour `sam3vision` → la puce juste comptait comme absente.
+        # Seen on #215 on 29/10: the model returned `sam3Vision` (capital V)
+        # for `sam3vision` → the correct bullet counted as absent.
         raisons = {"app/src/main/java/dev/sam3Vision/app/ParentShareSettings.kt":
-                   "ajoute la section Réglages"}
+                   "adds the Settings section"}
         couverts, manquants = scope_agent.rapprocher(
             raisons, ["app/src/main/java/dev/sam3vision/app/"
                       "ParentShareSettings.kt"], self.g)
         self.assertEqual(manquants, [])
         self.assertEqual(couverts, {"app/src/main/java/dev/sam3vision/app/"
                                     "ParentShareSettings.kt":
-                                    "ajoute la section Réglages"})
+                                    "adds the Settings section"})
 
     def test_casse_et_glob(self):
-        raisons = {"APP/**/Settings*.kt": "lit le lien"}
+        raisons = {"APP/**/Settings*.kt": "reads the link"}
         _, manquants = scope_agent.rapprocher(
             raisons, ["app/src/main/java/dev/sam3vision/app/SettingsScreen.kt"],
             self.g)
@@ -168,11 +168,11 @@ class RapprocherTest(unittest.TestCase):
 
 
 class RecomposerRecalcitrantTest(unittest.TestCase):
-    """Les lignes que le garde lira comme déclarations sont traitées comme telles.
+    """Lines the guard reads as declarations are treated as such.
 
-    Non-régression 29/10 (#263) : `- `Parler`` dans la section Scope était
-    gardé comme « prose » (PUCE exige une raison) puis compté par le garde
-    comme périmètre surdimensionné — corps refusé.
+    Non-regression 29/10 (#263): `- `Parler`` in the Scope section was
+    kept as 'prose' (PUCE requires a reason) then counted by the guard
+    as oversized scope — body refused.
     """
 
     def setUp(self):
@@ -207,7 +207,7 @@ class RecomposerRecalcitrantTest(unittest.TestCase):
 
 
 class RelanceTest(unittest.TestCase):
-    """Une omission du modèle déclenche une relance ciblée, pas un abandon."""
+    """A model omission triggers a targeted retry, not an abandonment."""
 
     def test_second_appel_limite_aux_manquants(self):
         fichiers = [fichier("app/A.kt"), fichier("app/B.kt")]
@@ -241,7 +241,7 @@ class RelanceTest(unittest.TestCase):
 
 
 class PuceToleranteTest(unittest.TestCase):
-    """Formats que le modèle rend réellement (listes numérotées, ./)."""
+    """Formats the model really returns (numbered lists, ./)."""
 
     def test_liste_numerotee(self):
         self.assertEqual(scope_agent.raisons_repondue("1. app/A.kt — x"),
@@ -259,10 +259,10 @@ class PuceToleranteTest(unittest.TestCase):
 class InvocationSweepTest(unittest.TestCase):
     """Le sweep doit appeler l'agent avec le PAT, pas le token bot.
 
-    Non-régression v27 (31/10) : l'édition du corps avec le token de
-    l'installation ne déclenche aucun workflow (anti-boucle GitHub), donc
-    `couche0` ne rejugeait jamais le corps corrigé et la PR restait BLOCKED
-    sur un verdict périmé (#688). Le sweep invoque `scope_agent` via
+    Non-regression v27 (31/10): editing the body with the installation
+    token triggers no workflow (GitHub anti-loop), so `couche0` never
+    re-judged the corrected body and the PR stayed BLOCKED on a scope
+    verdict (#688). The sweep invokes `scope_agent` via
     `fw-scope.py` : cette invocation doit porter `GH_TOKEN="$GH_ECRITURE"`.
     """
 
@@ -278,7 +278,7 @@ class InvocationSweepTest(unittest.TestCase):
                         "aucune invocation de fw-scope.py dans pr-auto-merge.yml")
         for ligne in invocations:
             self.assertIn('GH_TOKEN="$GH_ECRITURE"', ligne,
-                          "l'agent de périmètre doit écrire avec le PAT : %s"
+                          "the scope agent must write with the PAT: %s"
                           % ligne.strip())
 
     def test_filet_verdict_perime(self):

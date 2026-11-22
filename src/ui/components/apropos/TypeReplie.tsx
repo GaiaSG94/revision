@@ -4,9 +4,9 @@ import { ExplicationType } from '../ExplicationType'
 type Props = { explication: FichePedagogique }
 
 /**
- * Un type d'erreur replié sur lui-même : `<details>` natif, aucune dépendance.
- * À douze entrées, l'écran reste lisible — on déplie ce qu'on veut comprendre.
- * Le contenu pédagogique est celui du produit (`ExplicationType`), pas une copie.
+ * A collapsible error type: native `<details>`, no dependency. With twelve
+ * entries, the screen stays readable — expand what you want to understand.
+ * The teaching content is the product's (`ExplicationType`), not a copy.
  */
 export function TypeReplie({ explication }: Props) {
   return (

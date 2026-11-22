@@ -1,15 +1,15 @@
 ﻿name: CI
 
-# CI de RaturÃ© : typecheck strict, tests (domaine, corpus, quota du proxy),
-# build de production et gardes de qualitÃ© (taille des fichiers/fonctions,
-# contrÃ´les du socle). Verdict en quelques dizaines de secondes sur un runner
-# auto-hÃ©bergÃ© du r630 ; budget dur de 5 minutes (rÃ¨gle user 2026-10-24).
+# CI for Rature: strict typecheck, tests (domain, corpus, proxy quota),
+# production build and quality guards (file/function sizes, layer checks).
+# Verdict in a few tens of seconds on a self-hosted r630 runner; hard 5 min
+# budget (user rule 2026-10-24).
 #
-# Le check publiÃ© s'appelle `ci` (nom du job) : il est exigÃ© par le ruleset de
-# `main`, par la file Mergify, avec `ci-budget` et `couche0`.
+# The published check is called `ci` (job name): required by `main`'s ruleset
+# and the Mergify queue, along with `ci-budget` and `couche0`.
 on:
   pull_request:
-  # File de merge : mÃªme contrÃ´le sur le commit temporaire du groupe.
+  # Merge queue: same check on the group’s temporary commit.
   merge_group:
   workflow_dispatch:
 
@@ -32,15 +32,15 @@ jobs:
           persist-credentials: false
           clean: false
 
-      # Runners auto-hÃ©bergÃ©s persistants : un sous-dossier parasite d'un run
-      # prÃ©cÃ©dent peut survivre et fausser les tests. Nettoyage complet.
-      - name: Nettoyage du workspace
+      # Persistent self-hosted runners: a stray subfolder from a previous
+      # run may survive and skew the tests. Full cleanup.
+      - name: Clean the workspace
         shell: bash
         run: git clean -ffdx
 
-      # Node n'est pas dans le PATH d'un shell non connectÃ© sur le worker :
-      # `~/bin` porte `node`, `npm` et `gh`.
-      - name: Outillage Node
+      # Node is not in the PATH of a non-login shell on the worker:
+      # `~/bin` holds `node`, `npm` and `gh`.
+      - name: Node tooling
         shell: bash
         run: |
           set -euo pipefail
@@ -49,7 +49,7 @@ jobs:
           node --version
           npm --version
 
-      - name: DÃ©pendances
+      - name: Dependencies
         shell: bash
         run: npm ci --prefer-offline --no-audit --no-fund
 
@@ -57,22 +57,22 @@ jobs:
         shell: bash
         run: npm run typecheck
 
-      - name: Tests (logique pure, aucun rÃ©seau)
+      - name: Tests (pure logic, no network)
         shell: bash
         run: npm test
 
-      - name: Build de production
+      - name: Production build
         shell: bash
         run: npm run build
 
-      # Garde de taille : < 500 lignes par fichier, fonctions < 50 lignes.
-      - name: Taille des fichiers et des fonctions
+      # Size guard: < 500 lines per file, functions < 50 lines.
+      - name: File and function sizes
         shell: bash
         run: node scripts/check-tokens.mjs
 
-      # Les gardes de la CI se testent elles-mÃªmes : couche0 + agents de
-      # conflit. stdlib Python, quelques secondes, aucun rÃ©seau.
-      - name: Tests des gardes CI (couche0, agents)
+      # CI guards test themselves: couche0 + conflict agents.
+      # Python stdlib, a few seconds, no network.
+      - name: CI guard tests (couche0, agents)
         shell: bash
         run: |
           set -euo pipefail

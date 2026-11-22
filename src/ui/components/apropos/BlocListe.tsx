@@ -6,8 +6,8 @@ const TONS: Record<NonNullable<Props['ton']>, string> = {
 }
 
 /**
- * Bloc titré + liste de points : la forme répétée des sections documentaires.
- * Un seul endroit pour ce rendu, donc aucun balisage recopié.
+ * Titled block + bulleted list: the repeated pattern of the documentation
+ * sections. A single place for this rendering, so no markup is copied.
  */
 export function BlocListe({ titre, items, ton = 'jaune' }: Props) {
   return (

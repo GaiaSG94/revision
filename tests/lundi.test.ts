@@ -22,20 +22,20 @@ function stats(entrees: Partial<Record<CodeErreur, number>>, nbCopies = 10): Sta
 }
 
 describe('quoiReprendreLundi', () => {
-  it('deux types nets → deux entrées triées par fréquence', () => {
+  it('two clear types → two entries sorted by frequency', () => {
     const plan = quoiReprendreLundi(stats({ E01: 6, E02: 4 }))
     expect(plan.types).toEqual(['E01', 'E02'])
     expect(plan.exercices.map((e) => e.code)).toEqual(['E01', 'E02'])
     expect(plan.types.length).toBe(2)
   })
 
-  it('second type sous le seuil → une seule entrée', () => {
+  it('second type below the threshold → one entry', () => {
     const plan = quoiReprendreLundi(stats({ E01: 9, E02: 1 }))
     expect(plan.types).toEqual(['E01'])
     expect(plan.exercices.length).toBe(1)
   })
 
-  it('classe sans erreur pondérée → phrase de repli et tableaux vides', () => {
+  it('class with no weighted error → fallback sentence and empty arrays', () => {
     const plan = quoiReprendreLundi(stats({}))
     expect(plan.phrase).toBe('Nothing to review with the whole class.')
     expect(plan.types).toEqual([])
@@ -43,19 +43,19 @@ describe('quoiReprendreLundi', () => {
     expect(plan.partCumulee).toBe(0)
   })
 
-  it('E11 et E99 ne sont jamais retenus dans le plan', () => {
+  it('E11 and E99 are never kept in the plan', () => {
     const plan = quoiReprendreLundi(stats({ E11: 5, E99: 3, E01: 2 }))
     expect(plan.types).not.toContain('E11')
     expect(plan.types).not.toContain('E99')
     expect(plan.types).toEqual(['E01'])
   })
 
-  it('part cumulée exacte des types retenus', () => {
+  it('exact cumulative share of the selected types', () => {
     const plan = quoiReprendreLundi(stats({ E01: 5, E02: 3, E03: 2 }))
     expect(plan.partCumulee).toBeCloseTo(0.8, 10)
   })
 
-  it('chaque consigne est non vide et compte au plus 25 mots', () => {
+  it('each instruction is non-empty and has at most 25 words', () => {
     const plan = quoiReprendreLundi(stats({ E01: 6, E02: 4 }))
     for (const exercice of plan.exercices) {
       const consigne = exercice.consigne.trim()
@@ -64,7 +64,7 @@ describe('quoiReprendreLundi', () => {
     }
   })
 
-  it('aucun mot culpabilisant dans les phrases', () => {
+  it('no blameful word in the sentences', () => {
     const culpabilisants = ['faute', 'fautes', 'nul', 'mauvaise', 'mauvais', 'incapable', 'échec', 'punition', 'sanction', 'raté', 'honte']
     const plan = quoiReprendreLundi(stats({ E01: 6, E02: 4 }))
     const phrase = plan.phrase.toLowerCase()

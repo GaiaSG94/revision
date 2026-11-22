@@ -8,7 +8,7 @@ const TONS: Record<NonNullable<Props['ton']>, string> = {
   vert: 'bg-vert-doux',
 }
 
-/** Surface d'information : une idée par carte, jamais plus. */
+/** Information surface: one idea per card, never more. */
 export function Carte({ titre, children, ton = 'neutre' }: Props) {
   return (
     <section className={`rounded-xl border-[3px] border-texte ombre-dure ${TONS[ton]} p-4 sm:p-5`}>

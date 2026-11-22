@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 /**
- * idb-keyval remplacé par une Map en mémoire : le cache se teste sans
- * navigateur. `__store` permet d'inspecter ce qui est réellement écrit.
+ * idb-keyval replaced by an in-memory Map: the cache is tested without a
+ * browser. `__store` lets us inspect what is really written.
  */
 vi.mock('idb-keyval', () => {
   const store = new Map<string, unknown>()
@@ -58,8 +58,8 @@ beforeEach(() => {
   vi.useRealTimers()
 })
 
-describe('cache local des analyses (idée 4)', () => {
-  it('l’empreinte est stable, déterministe et distincte par image', async () => {
+describe('local analysis cache (idea 4)', () => {
+  it('the fingerprint is stable, deterministic and distinct per image', async () => {
     const a = await empreinteImage('data:image/png;base64,AAA')
     const b = await empreinteImage('data:image/png;base64,AAA')
     const c = await empreinteImage('data:image/png;base64,BBB')
@@ -68,31 +68,31 @@ describe('cache local des analyses (idée 4)', () => {
     expect(a).toMatch(/^[0-9a-f]{64}$/)
   })
 
-  it('écrit puis relit une analyse, sans aucune image dedans', async () => {
+  it('writes then reads back an analysis, with no image inside', async () => {
     const empreinte = await empreinteImage('data:image/png;base64,AAA')
     await ecrireCache(empreinte, analyse('d1', new Date().toISOString()))
     const relu = await lireCache(empreinte)
     expect(relu?.diagnostic.id).toBe('d1')
     expect(relu?.diagnostic.erreurs[0]?.code).toBe('E01')
-    // RNF-P1 : jamais d'image dans ce qui est persisté.
-    const brut = JSON.stringify(magasin.get(`rature/cache/${empreinte}`))
+    // RNF-P1: never an image in what is persisted.
+    const brut = JSON.stringify(magasin.get(`revision/cache/${empreinte}`))
     expect(brut).not.toContain('base64')
     expect(brut).not.toContain('imageAnonymisee')
   })
 
-  it('une entrée périmée est ignorée puis supprimée', async () => {
+  it('an expired entry is ignored then deleted', async () => {
     vi.useFakeTimers().setSystemTime(new Date('2026-11-12T12:00:00Z'))
     const empreinte = await empreinteImage('data:image/png;base64,CCC')
     await ecrireCache(empreinte, analyse('vieux', '2026-11-12T12:00:00.000Z'))
     vi.setSystemTime(new Date(Date.parse('2026-11-12T12:00:00Z') + TTL_CACHE_MS + 1000))
     expect(await lireCache(empreinte)).toBeNull()
-    expect(magasin.has(`rature/cache/${empreinte}`)).toBe(false)
+    expect(magasin.has(`revision/cache/${empreinte}`)).toBe(false)
   })
 
-  it('le cache est plafonné : les plus anciennes entrées sautent', async () => {
+  it('the cache is capped: the oldest entries are dropped', async () => {
     const reference = Date.parse('2026-11-12T12:00:00Z')
-    // Horloge figée juste après la plus récente écriture : sans elle, le test
-    // dépend de la date réelle et échoue dès que 24 h sont passées.
+    // Clock frozen just after the most recent write: without it, the test
+    // depends on the real date and fails once 24 h have passed.
     vi.useFakeTimers().setSystemTime(new Date(reference + (MAX_ENTREES_CACHE + 6) * 1000))
     for (let i = 0; i < MAX_ENTREES_CACHE + 5; i += 1) {
       const empreinte = `empreinte-${i}`
@@ -100,22 +100,22 @@ describe('cache local des analyses (idée 4)', () => {
     }
     const restants = (await purgerCache()) as number
     expect(restants).toBeLessThanOrEqual(MAX_ENTREES_CACHE)
-    // La plus ancienne a été purgée, la plus récente conservée.
+    // The oldest was purged, the newest kept.
     expect(await lireCache('empreinte-0')).toBeNull()
     expect((await lireCache(`empreinte-${MAX_ENTREES_CACHE + 4}`))?.diagnostic.id).toBe(
       `d${MAX_ENTREES_CACHE + 4}`,
     )
   })
 
-  it('viderCache ne touche pas l’historique des diagnostics', async () => {
+  it('viderCache does not touch the diagnosis history', async () => {
     await ecrireCache('e1', analyse('d1', new Date().toISOString()))
-    magasin.set('rature/diagnostics', [diagnostic('autre')])
+    magasin.set('revision/diagnostics', [diagnostic('autre')])
     await viderCache()
-    expect(magasin.has('rature/cache/e1')).toBe(false)
-    expect(magasin.has('rature/diagnostics')).toBe(true)
+    expect(magasin.has('revision/cache/e1')).toBe(false)
+    expect(magasin.has('revision/diagnostics')).toBe(true)
   })
 
-  it('une clé absente rend null, pas une exception', async () => {
+  it('a missing key returns null, not an exception', async () => {
     await expect(lireCache('inconnue')).resolves.toBeNull()
   })
 })

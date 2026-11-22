@@ -11,31 +11,31 @@ import {
 
 const id = { id: 'd1', createdAt: '2026-11-11T10:00:00.000Z' }
 
-describe('seuil de confiance et normalisation', () => {
-  it('0,60 exactement reste typée, 0,59 devient E99', () => {
+describe('confidence threshold and normalization', () => {
+  it('0.60 exactly stays typed, 0.59 becomes E99', () => {
     expect(normaliserErreur({ code: 'E01', confiance: 0.6 }).code).toBe('E01')
     expect(normaliserErreur({ code: 'E01', confiance: 0.59 }).code).toBe('E99')
   })
 
-  it('un code hors taxonomie devient E99', () => {
+  it('a code outside the taxonomy becomes E99', () => {
     expect(normaliserErreur({ code: 'E42', confiance: 0.99 }).code).toBe('E99')
     expect(normaliserErreur({ code: 'n_importe_quoi', confiance: 0.99 }).code).toBe('E99')
   })
 
-  it('une confiance hors bornes est bornée, E11 n’est pas pondérée', () => {
+  it('an out-of-range confidence is clamped, E11 is not weighted', () => {
     expect(normaliserErreur({ code: 'E01', confiance: 4 }).confiance).toBe(1)
     expect(normaliserErreur({ code: 'E11', confiance: 0.9 }).ponderee).toBe(false)
     expect(normaliserErreur({ code: 'E01', confiance: 0.9 }).ponderee).toBe(true)
   })
 
-  it('un diagnostic sans faute n’a pas de type dominant', () => {
+  it('a diagnosis with no error has no dominant type', () => {
     const diagnostic = construireDiagnostic([], id)
     expect(diagnostic.nbFautes).toBe(0)
     expect(diagnostic.typeDominant).toBeNull()
   })
 })
 
-describe('profil d’erreur', () => {
+describe('error profile', () => {
   const diagnostic = construireDiagnostic(
     [
       { code: 'E01', ligne: 'a', explication: 'x', confiance: 0.9 },
@@ -46,7 +46,7 @@ describe('profil d’erreur', () => {
     id,
   )
 
-  it('E99 sort du profil, E11 est signalée mais compte pour zéro', () => {
+  it('E99 leaves the profile, E11 is reported but counts for zero', () => {
     const profil = agreger(profilVide(), diagnostic)
     expect(profil.parType.E01).toBe(2)
     expect(profil.parType.E11).toBe(0)
@@ -55,7 +55,7 @@ describe('profil d’erreur', () => {
     expect(profil.signalees.E99).toBe(1)
   })
 
-  it('dominant, part et phrase de synthèse', () => {
+  it('dominant type, share and summary sentence', () => {
     const profil = agreger(agreger(profilVide(), diagnostic), { ...diagnostic, id: 'd2' })
     expect(typeDominant(profil)).toBe('E01')
     expect(Math.round(partDuType(profil, 'E01') * 100)).toBe(100)
@@ -64,13 +64,13 @@ describe('profil d’erreur', () => {
     expect(classement(profil).map((e) => e.code)).toEqual(['E01'])
   })
 
-  it('profil vide : pas de dominant, phrase d’invitation', () => {
+  it('empty profile: no dominant type, invitation sentence', () => {
     const vide = profilVide()
     expect(typeDominant(vide)).toBeNull()
     expect(phraseSynthese(vide)).toContain('No recurring mistake')
   })
 
-  it('agréger ne mute jamais l’entrée', () => {
+  it('agreger never mutates the input', () => {
     const avant = profilVide()
     const copie = JSON.parse(JSON.stringify(avant)) as typeof avant
     agreger(avant, diagnostic)

@@ -1,8 +1,8 @@
 /**
- * Étape 4 — Classification : chaque annotation reçoit un code de la taxonomie
- * fermée, avec une confiance. Le seuil (0,6) et la pondération (E11 = 0) sont
- * appliqués par `normaliserErreur`, pas par le modèle : c'est nous qui tenons
- * la règle, jamais le modèle.
+ * Step 4 — Classification: each annotation receives a code from the closed
+ * taxonomy, with a confidence. The threshold (0.6) and weighting (E11 = 0) are
+ * applied by `normaliserErreur`, not by the model: we hold the rule, never the
+ * model.
  */
 import promptMd from '../../prompts/classification.md?raw'
 import { TAXONOMIE } from '../domain/taxonomy'
@@ -13,14 +13,14 @@ import type { ClientBrut } from './client'
 import type { Transport } from './llm'
 import { parserClassification } from './schemas'
 
-/** Taxonomie rendue en texte : une seule source de vérité, le code. */
+/** Taxonomy rendered as text: a single source of truth, the code. */
 export function blocTaxonomie(): string {
   return TAXONOMIE.map((t) => `- \`${t.code}\` — **${t.libelle}** : ${t.signature}`).join('\n')
 }
 
 export const PROMPT_CLASSIFICATION = promptMd.replace('{{TAXONOMIE}}', blocTaxonomie())
 
-/** Les annotations sont numérotées : le modèle répond dans le même ordre. */
+/** Annotations are numbered: the model answers in the same order. */
 export function messageAnnotations(extraction: Extraction): string {
   const lignes = extraction.annotations.map((annotation, index) => {
     const morceaux = [`${index + 1}. line: ${annotation.ligne}`, `   annotation: ${annotation.annotation}`]
@@ -40,14 +40,14 @@ export async function classerAnnotations(
   transport: Transport,
   client: ClientBrut = clientParDefaut(transport),
 ): Promise<Erreur[]> {
-  // Copie propre : on ne classe rien. Zéro appel, zéro faute inventée (RNF-04).
+  // Clean paper: classify nothing. Zero calls, zero invented errors (RNF-04).
   if (extraction.copiePropre || extraction.annotations.length === 0) return []
 
   const texte = await client({
     system: PROMPT_CLASSIFICATION,
     user: messageAnnotations(extraction),
     json: true,
-    temperature: 0.1,
+    temperevision: 0.1,
     maxTokens: 2000,
   })
   return parserClassification(texte).map(normaliserErreur)

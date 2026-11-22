@@ -5,9 +5,9 @@ import { totalPondere } from './profil'
 import type { Profil } from './types'
 
 /**
- * Mode prof (RF-20) : mêmes tuyaux, nouvelle vue. On agrège N copies en une
- * statistique de classe — c'est le multiplicateur d'impact du produit :
- * le professeur sait quoi reprendre lundi.
+ * Teacher mode (RF-20): same pipelines, new view. Aggregates N papers into a
+ * class-wide statistic — this is the product's impact multiplier: the teacher
+ * knows what to go over on Monday.
  */
 export function statsClasse(diagnostics: Diagnostic[]): StatsClasse {
   const parType = {} as Record<CodeErreur, number>

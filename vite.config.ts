@@ -2,22 +2,22 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
-// Vite n'embarque pas les types Node : on déclare le seul accès utile.
+// Vite does not ship Node types: declare the only useful access.
 declare const process: { env: Record<string, string | undefined> }
 
-// Webapp statique : le build va dans dist/, servi par GitHub Pages (ou
-// n'importe quel hébergeur statique). Aucune variable secrète n'entre dans le
-// bundle : la clé InferHub vit dans le proxy (`api/`).
+// Static webapp: the build goes to dist/, served by GitHub Pages (or any
+// static host). No secret variable enters the bundle: the InferHub key lives
+// in the proxy (`api/`).
 export default defineConfig({
-  // GitHub Pages sert le site sous /rature/ ; en local et sur un hôte racine,
-  // la base reste '/'. Le workflow pages.yml pose VITE_BASE=/rature/.
+  // GitHub Pages serves the site under /revision/; locally and on a root host,
+  // the base stays '/'. The pages.yml workflow sets VITE_BASE=/revision/.
   base: process.env.VITE_BASE ?? '/',
   plugins: [react(), tailwindcss()],
   build: {
     target: 'es2022',
     sourcemap: false,
-    // RNF-07 : bundle initial < 300 Ko gzip. On découpe le socle React pour
-    // que l'accueil (seul écran du premier rendu) reste léger.
+    // RNF-07: initial bundle < 300 KB gzip. Split the React base so the home
+    // screen (the only screen of the first render) stays light.
     rollupOptions: {
       output: {
         manualChunks: { vendor: ['react', 'react-dom'] },

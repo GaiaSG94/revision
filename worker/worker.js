@@ -1,18 +1,17 @@
 /**
- * Variante Cloudflare Worker du proxy (§18.1) — même contrat que le proxy
- * Modal, zéro dépendance. Le quota est en mémoire par isolate : c'est une
- * approximation assumée (un Worker redémarre souvent), suffisante pour borner
- * un quota de démo.
+ * Cloudflare Worker variant of the proxy (§18.1) — same contract as the Modal
+ * proxy, zero dependencies. The quota is in memory per isolate: an accepted
+ * approximation (a Worker restarts often), enough to bound a demo quota.
  *
- * Ce Worker ne parle pas SSE : le champ `stream` est retiré avant le relais,
- * la réponse reste JSON et le client retombe sur son chemin classique.
+ * This Worker does not speak SSE: the `stream` field is removed before relaying,
+ * the response stays JSON and the client falls back to its classic path.
  *
- * Comme le proxy Modal, il descend **la chaîne de modèles côté serveur** :
- * InferHub est une place de marché, un modèle peut être sans capacité
- * (503) ou hors enchère (402) d'une minute à l'autre.
+ * Like the Modal proxy, it walks **the model chain server-side**: InferHub is a
+ * marketplace, a model can be out of capacity (503) or out of auction (402)
+ * from one minute to the next.
  *
- * Déploiement : `wrangler deploy worker/worker.js --name errata-proxy`
- * puis `wrangler secret put INFERHUB_API_KEY`.
+ * Deployment: `wrangler deploy worker/worker.js --name revision-proxy`
+ * then `wrangler secret put INFERHUB_API_KEY`.
  */
 
 const TAILLE_MAX = 15 * 1024 * 1024
@@ -31,7 +30,7 @@ const ORIGINES = [
   'http://127.0.0.1:5173',
 ]
 
-/** Chaîne serveur, alignée sur CHAINE_MODELES de src/domain/config.ts. */
+/** Server chain, aligned with CHAINE_MODELES in src/domain/config.ts. */
 const CHAINE = [
   'ag/gemini-4-carbon',
   'ag/claude-sonnet-4-6',
@@ -44,14 +43,14 @@ const CHAINE = [
 
 const AMONT = 'https://api.inferhub.dev/v1'
 
-/** L'en-tête CORS n'est renvoyé que pour une origine connue. */
+/** The CORS header is only returned for a known origin. */
 function entetesCors(request) {
   const origine = request.headers.get('origin')
   if (!origine || !ORIGINES.includes(origine)) return {}
   return {
     'access-control-allow-origin': origine,
     'access-control-allow-methods': 'GET, POST, OPTIONS',
-    'access-control-allow-headers': 'content-type, x-rature-cle',
+    'access-control-allow-headers': 'content-type, x-revision-cle',
     'access-control-max-age': '600',
     vary: 'Origin',
   }
@@ -85,7 +84,7 @@ function empreinte(ip) {
   return `v${h.toString(36)}`
 }
 
-/** Un modèle mort (402/503) n'est pas retenté pendant 60 s. */
+/** A dead model (402/503) is not retried for 60 s. */
 function disponible(modele, maintenant) {
   return (horsService.get(modele) || 0) <= maintenant
 }
@@ -101,14 +100,14 @@ function etatDisjoncteur(maintenant) {
   return etat
 }
 
-/** Modèle demandé d'abord, puis le reste de la chaîne, sans doublon. */
+/** Requested model first, then the rest of the chain, without duplicates. */
 function chainePour(demande) {
   if (!demande) return [...CHAINE]
   return [demande, ...CHAINE.filter((m) => m !== demande)]
 }
 
-/** Un appel à l'amont : JSON en entrée, `{statut, texte|erreur}` en sortie. Sur
- *  429 (« retry shortly »), une seule pause de 3 s avant de rendre la main. */
+/** One upstream call: JSON in, `{statut, texte|erreur}` out. On 429
+ *  ("retry shortly"), a single 3 s pause before giving up. */
 async function appelerAmont(charge, modele, cle) {
   const tenter = () =>
     fetch(`${AMONT}/chat/completions`, {
@@ -125,15 +124,15 @@ async function appelerAmont(charge, modele, cle) {
   const data = await reponse.json()
   if (reponse.status === 200) {
     const texte = data?.choices?.[0]?.message?.content || ''
-    if (!texte) return { statut: 502, erreur: 'Réponse vide du modèle.' }
+    if (!texte) return { statut: 502, erreur: 'Empty response from the model.' }
     return { statut: 200, texte }
   }
-  return { statut: reponse.status, erreur: data?.error?.message || 'Amont indisponible.' }
+  return { statut: reponse.status, erreur: data?.error?.message || 'Upstream unavailable.' }
 }
 
-/** Descend la chaîne : le modèle mort ne fait pas payer un aller-retour client. */
+/** Walks the chain: a dead model does not cost a client round trip. */
 async function relayer(charge, cle, maintenant) {
-  let derniereErreur = 'aucun modèle disponible'
+  let derniereErreur = 'no model available'
   let dernierStatut = 503
   let tentatives = 0
   for (const modele of chainePour(charge.model)) {
@@ -144,7 +143,7 @@ async function relayer(charge, cle, maintenant) {
       resultat = await appelerAmont(charge, modele, cle)
     } catch {
       signaler(modele, maintenant, true)
-      derniereErreur = 'Amont injoignable ou trop lent.'
+      derniereErreur = 'Upstream unreachable or too slow.'
       dernierStatut = 504
       continue
     }
@@ -168,32 +167,32 @@ export default {
 
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors })
     if (request.method === 'GET' && chemin === '/health') {
-      return json({ ok: true, service: 'errata-proxy-worker', disjoncteur: etatDisjoncteur(maintenant) }, 200, cors)
+      return json({ ok: true, service: 'revision-proxy-worker', disjoncteur: etatDisjoncteur(maintenant) }, 200, cors)
     }
     if (request.method === 'GET' && chemin === '/modeles') {
       return json({ chaine: CHAINE, disjoncteur: etatDisjoncteur(maintenant), amont: AMONT }, 200, cors)
     }
-    if (request.method !== 'POST') return json({ erreur: 'Méthode non autorisée.' }, 405, cors)
+    if (request.method !== 'POST') return json({ erreur: 'Method not allowed.' }, 405, cors)
 
-    const cle = request.headers.get('x-rature-cle') || env.INFERHUB_API_KEY
-    if (!cle) return json({ erreur: 'Proxy non configuré : colle ta clé (BYOK).' }, 503, cors)
+    const cle = request.headers.get('x-revision-cle') || env.INFERHUB_API_KEY
+    if (!cle) return json({ erreur: 'Proxy not configured: paste your key (BYOK).' }, 503, cors)
 
     const ip = request.headers.get('cf-connecting-ip') || 'inconnu'
     if (!autoriser(empreinte(ip), maintenant)) {
-      return json({ erreur: 'Quota du proxy atteint pour cette heure. Réessaie plus tard.', quota: 'proxy' }, 429, cors)
+      return json({ erreur: 'Proxy quota reached for this hour. Try again later.', quota: 'proxy' }, 429, cors)
     }
 
     const brut = await request.text()
-    if (brut.length > TAILLE_MAX) return json({ erreur: 'Photo trop lourde.' }, 413, cors)
+    if (brut.length > TAILLE_MAX) return json({ erreur: 'Photo too large.' }, 413, cors)
 
     let charge
     try {
       charge = JSON.parse(brut)
     } catch {
-      return json({ erreur: 'Corps JSON invalide.' }, 400, cors)
+      return json({ erreur: 'Invalid JSON body.' }, 400, cors)
     }
-    // Ce proxy ne parle pas SSE : sans retrait du champ, l'amont répondrait en
-    // event-stream et ce Worker rendrait du JSON illisible.
+    // This proxy does not speak SSE: without removing the field, the upstream
+    // would answer with an event stream and this Worker would return unreadable JSON.
     delete charge.stream
 
     const debut = Date.now()

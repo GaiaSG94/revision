@@ -8,9 +8,9 @@ import { telechargerCsv } from '../../export/telecharger'
 import { Bouton } from '../components/Bouton'
 import { Carte } from '../components/Carte'
 import { CarteLundi } from '../components/CarteLundi'
-import { useRature } from '../../etat/useRature'
+import { useRature } from '../../etat/useRevision'
 
-/** Écran 7 — mode prof (RF-20) : N copies → statistique de classe + CSV. */
+/** Screen 7 — teacher mode (RF-20): N papers → class statistic + CSV. */
 export function Prof() {
   const { analyserLot, analyserLotDemo, occupe, erreur } = useRature()
   const [fichiers, setFichiers] = useState<File[]>([])
@@ -95,7 +95,7 @@ export function Prof() {
             </ul>
           </Carte>
 
-          <Bouton variante="secondaire" onClick={() => telechargerCsv(statsEnCsv(stats), 'errata-class')}>
+          <Bouton variante="secondaire" onClick={() => telechargerCsv(statsEnCsv(stats), 'revision-class')}>
             Export the statistics (CSV)
           </Bouton>
         </>

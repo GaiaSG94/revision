@@ -9,8 +9,8 @@ import { Prof } from './screens/Prof'
 import { Profil } from './screens/Profil'
 import { Reglages } from './screens/Reglages'
 import { Entete } from './components/Entete'
-import { useRature } from '../etat/useRature'
-import type { Ecran } from '../etat/useRature'
+import { useRature } from '../etat/useRevision'
+import type { Ecran } from '../etat/useRevision'
 import { useEffect } from 'react'
 import type { JSX } from 'react'
 
@@ -28,9 +28,9 @@ const ECRANS: Record<Ecran, () => JSX.Element> = {
 }
 
 /**
- * La trame de points réagit au pointeur : deux calques se décalent en sens
- * opposés (parallaxe). L'amortissement (0,08) rend le suivi mou, jamais
- * saccadé ; le mouvement est coupé si l'utilisateur demande moins de motion.
+ * The dot grid reacts to the pointer: two layers shift in opposite directions
+ * (parallax). Damping (0.08) makes the tracking smooth, never jerky; motion is
+ * disabled if the user requests reduced motion.
  */
 function useParallaxeTrame() {
   useEffect(() => {
@@ -62,7 +62,7 @@ function useParallaxeTrame() {
   }, [])
 }
 
-/** Routeur maison : un état, huit écrans, aucune dépendance externe. */
+/** Home-grown router: one state, eight screens, no external dependency. */
 const ETIQUETTES_SANTE = {
   ok: 'model online',
   ko: 'model unavailable',
@@ -76,7 +76,7 @@ export function Application() {
   return (
     <div className="relative z-10 mx-auto flex min-h-dvh w-full max-w-[1500px] flex-col px-4 py-5 sm:px-7 lg:px-10">
       <Entete />
-      <main className="errata-zone flex-1">
+      <main className="revision-zone flex-1">
         <EcranActif />
       </main>
       <footer className="mt-6 px-1 text-xs text-white/85">

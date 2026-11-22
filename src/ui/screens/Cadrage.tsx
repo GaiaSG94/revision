@@ -3,9 +3,9 @@ import { TAILLE_MAX_IMAGE_OCTETS } from '../../domain/config'
 import { Bouton } from '../components/Bouton'
 import { BandeauSante } from '../components/BandeauSante'
 import { Carte } from '../components/Carte'
-import { useRature } from '../../etat/useRature'
+import { useRature } from '../../etat/useRevision'
 
-/** Écran 2 : cadrage — aperçu avant analyse, refus poli si trop lourd. */
+/** Screen 2: framing — preview before analysis, polite refusal if too large. */
 export function Cadrage() {
   const { analyser, analyserDemo, erreur, reinitialiserErreur, occupe } = useRature()
   const [fichier, setFichier] = useState<File | null>(null)

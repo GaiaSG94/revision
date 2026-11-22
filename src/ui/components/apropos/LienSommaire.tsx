@@ -1,6 +1,6 @@
 type Props = { ancre: string; titre: string }
 
-/** Lien interne du sommaire : ancre `#` vers une section du même écran. */
+/** Internal table-of-contents link: a `#` anchor to a section on the same screen. */
 export function LienSommaire({ ancre, titre }: Props) {
   return (
     <a

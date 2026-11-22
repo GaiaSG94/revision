@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""Génère le corpus de copies synthétiques servant à valider le modèle.
+"""Generate the corpus of synthetic papers used to validate the model.
 
-Deux familles d'images :
-  - **nettes** : une copie par type d'erreur visé, pour mesurer la justesse du
-    typage (E01..E12) ;
-  - **dégradées** : rotation, lumière inégale, bruit et flou légers, pour
-    approcher une photo de téléphone et mesurer la robustesse.
+Two families of images:
+  - **clean**: one paper per targeted error type, to measure typing accuracy
+    (E01..E12);
+  - **degraded**: rotation, uneven light, noise and slight blur, to approach a
+    phone photo and measure robustness.
 
-Chaque image est décrite dans `COPIES` (une seule source de vérité) : le
-rendu et le manifeste `corpus/images/manifeste.json` en découlent, donc la
-vérité terrain du banc live (`tests/live/`) ne peut pas diverger des images.
+Each image is described in `COPIES` (a single source of truth): the rendering
+and the `corpus/images/manifeste.json` manifest derive from it, so the live
+bench ground truth (`tests/live/`) cannot diverge from the images.
 
-Usage :
+Usage:
     python3 scripts/generer-copies.py [--sortie corpus/images] [--police /tmp/Caveat.ttf]
 
-Limite assumée : une copie synthétique n'est pas un vrai manuscrit. Elle
-valide le contrat des prompts et la robustesse aux conditions de prise de vue,
-pas la lecture d'une écriture réelle (protocole dans corpus/README.md).
+Accepted limitation: a synthetic paper is not real handwriting. It validates
+the prompt contract and robustness to shooting conditions, not the reading of
+real handwriting (protocol in corpus/README.md).
 """
 
 import argparse
@@ -38,7 +38,7 @@ PAS_LIGNE = 64
 
 
 def charger_polices(chemin: str):
-    """Police manuscrite pour l'élève, DejaVu pour l'imprimé."""
+    """Handwriting font for the student, DejaVu for print."""
     try:
         return {
             "eleve": ImageFont.truetype(chemin, 34),
@@ -51,7 +51,7 @@ def charger_polices(chemin: str):
 
 
 def feuille():
-    """Fond papier, lignes de cahier et marge."""
+    """Paper background, notebook lines and margin."""
     image = Image.new("RGB", (LARGEUR, HAUTEUR), PAPIER)
     dessin = ImageDraw.Draw(image)
     for y in range(180, HAUTEUR - 60, PAS_LIGNE):
@@ -61,7 +61,7 @@ def feuille():
 
 
 def rendre(copie, polices):
-    """Dessine une copie : en-tête, énoncé, lignes de l'élève, annotations, note."""
+    """Draws a paper: header, prompt, student's lines, annotations, grade."""
     image, dessin = feuille()
     dessin.text((180, 60), copie["eleve"], font=polices["eleve"], fill=BLEU_ELEVE)
     dessin.text((700, 66), f'{copie["classe"]} — {copie["devoir"]}', font=polices["imprime"], fill=NOIR)
@@ -85,7 +85,7 @@ def rendre(copie, polices):
 
 
 def degrader(image, niveau, graine):
-    """Rotation, lumière inégale, bruit et flou : approche d'une photo téléphone."""
+    """Rotation, uneven light, noise and blur: approximating a phone photo."""
     aleatoire = random.Random(graine)
     sortie = image.rotate(niveau["rotation"], expand=True, fillcolor=PAPIER, resample=Image.BICUBIC)
     if niveau.get("lumiere"):
@@ -218,12 +218,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--sortie", default="corpus/images")
     ap.add_argument("--police", default="/tmp/Caveat.ttf")
-    ap.add_argument("--demo", action="store_true", help="génère les photos de la démo (corpus/demo)")
+    ap.add_argument("--demo", action="store_true", help="generate the demo photos (corpus/demo)")
     ap.add_argument("--source-demo", default="corpus/copies-demo.json")
     ap.add_argument(
         "--uniquement",
         default="",
-        help="ids séparés par des virgules : ne régénère que ces copies de démo",
+        help="comma-separated ids: only regenerate these demo papers",
     )
     args = ap.parse_args()
 
@@ -250,23 +250,23 @@ def main():
 
     (sortie / "manifeste.json").write_text(json.dumps({"copies": manifeste}, indent=2) + "\n")
     for entree in manifeste:
-        print("%-34s dominant=%-5s dégradée=%s" % (entree["fichier"], entree["dominant"], entree["degradee"]))
+        print("%-34s dominant=%-5s degraded=%s" % (entree["fichier"], entree["dominant"], entree["degradee"]))
 
 
 
 
 # ---------------------------------------------------------------------------
-# Démo : copies d'un même élève, rendues puis « photographiées »
+# Demo: papers from the same student, rendered then "photographed"
 # ---------------------------------------------------------------------------
 
-POLICE_MANUSCRITE = os.environ.get("ERRATA_POLICE_MANUSCRITE", "/tmp/Caveat.ttf")
+POLICE_MANUSCRITE = os.environ.get("REVISION_POLICE_MANUSCRITE", "/tmp/Caveat.ttf")
 POLICE_IMPRIME = os.environ.get(
-    "ERRATA_POLICE_IMPRIME", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+    "REVISION_POLICE_IMPRIME", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 )
 
 
 def _police_manuscrite(taille):
-    """Police d'écriture manuscrite ; repli sur DejaVu si le fichier manque."""
+    """Handwriting font; fall back to DejaVu if the file is missing."""
     try:
         return ImageFont.truetype(POLICE_MANUSCRITE, taille)
     except OSError:
@@ -274,7 +274,7 @@ def _police_manuscrite(taille):
 
 
 def _rendre_copie(copie, dossier_sortie):
-    """Une page de cahier : énoncé imprimé, élève au bleu, prof au rouge."""
+    """A notebook page: printed prompt, student in blue, teacher in red."""
     largeur, hauteur = 1240, 1754
     page = Image.new("RGB", (largeur, hauteur), (250, 248, 242))
     dessin = ImageDraw.Draw(page)
@@ -282,7 +282,7 @@ def _rendre_copie(copie, dossier_sortie):
     manuscrit = _police_manuscrite(38)
     petit = _police_manuscrite(30)
 
-    # lignes de cahier très légèrement visibles (comme du vrai papier, pas un formulaire)
+    # notebook lines very slightly visible (like real paper, not a form)
     for y in range(150, hauteur - 60, 74):
         dessin.line([(90, y), (largeur - 70, y)], fill=(237, 241, 245), width=2)
     dessin.line([(150, 110), (150, hauteur - 60)], fill=(238, 206, 206), width=2)
@@ -302,12 +302,12 @@ def _rendre_copie(copie, dossier_sortie):
             dessin.text((190, y), ligne["texte"], font=imprime, fill=(35, 35, 35))
             y += 62
         elif genre == "eleve":
-            # L'écriture manuscrite n'est jamais parfaitement droite
+            # Handwriting is never perfectly straight
             _texte_manuscrit(dessin, ligne["texte"], 215 + alea.randint(-6, 8), y + alea.randint(-4, 4),
                              manuscrit, (24, 48, 112), alea.uniform(-1.1, 1.1))
             y += 72
         elif genre == "corrige":
-            # Le professeur corrige en marge : la position varie d'une ligne à l'autre
+            # The teacher corrects in the margin: position varies from line to line
             marge = 690 + alea.randint(0, 120)
             _texte_manuscrit(dessin, ligne.get("texte", ""), marge, y + alea.randint(-4, 6),
                              petit, (178, 30, 30), alea.uniform(-1.4, 1.4))
@@ -315,7 +315,7 @@ def _rendre_copie(copie, dossier_sortie):
                 _texte_manuscrit(dessin, ligne["prof"], marge, y + 36, petit, (178, 30, 30),
                                  alea.uniform(-1.4, 1.4))
             y += 84
-        else:  # annotation libre du professeur
+        else:  # free teacher annotation
             _texte_manuscrit(dessin, ligne.get("texte", ""), 720 + alea.randint(0, 90), y,
                              petit, (178, 30, 30), alea.uniform(-1.2, 1.2))
             y += 60
@@ -326,7 +326,7 @@ def _rendre_copie(copie, dossier_sortie):
 
 
 def _texte_manuscrit(dessin, texte, x, y, police, couleur, angle):
-    """Écrit le texte sur un calque transparent puis le pose légèrement incliné."""
+    """Writes the text on a transparent layer then places it slightly tilted."""
     if not texte:
         return
     largeur = int(police.getbbox(texte)[2] - police.getbbox(texte)[0]) + 24
@@ -338,21 +338,21 @@ def _texte_manuscrit(dessin, texte, x, y, police, couleur, angle):
 
 
 def _deformer(page, graine):
-    """Perspective : la page est photographiée de biais, pas à plat."""
+    """Perspective: the page is photographed at an angle, not flat."""
     alea = random.Random(graine)
     largeur, hauteur = page.size
-    # quadrilatère source : la page penche légèrement
+    # source quadrilateral: the page tilts slightly
     dx = alea.uniform(0.03, 0.08) * largeur
     dy = alea.uniform(0.02, 0.06) * hauteur
-    # Image.QUAD attend 8 valeurs : les 4 coins de la source, dans l'ordre
-    # haut-gauche, bas-gauche, bas-droite, haut-droite.
+    # Image.QUAD expects 8 values: the 4 source corners, in order
+    # top-left, bottom-left, bottom-right, top-right.
     quadrilatere = (
         int(dx), int(dy),
         int(dx * 0.4), int(hauteur - dy * 0.3),
         int(largeur - dx * 0.3), int(hauteur - dy),
         int(largeur - dx), int(dy * 0.5),
     )
-    # recadrage : on garde la page entière avec un peu de marge
+    # cropping: keep the whole page with a little margin
     marge = int(largeur * 0.05)
     cible = (largeur + 2 * marge, hauteur + 2 * marge)
     deforme = page.transform(cible, Image.QUAD, quadrilatere, resample=Image.BICUBIC)
@@ -360,11 +360,11 @@ def _deformer(page, graine):
 
 
 def _eclairage(page, graine):
-    """Lumière inégale + vignette : l'appareil n'éclaire pas uniformément."""
+    """Uneven light + vignette: the camera does not light evenly."""
     alea = random.Random(graine)
     largeur, hauteur = page.size
     direction = alea.choice((-1, 1))
-    # Petit dégradé agrandi : pas de bandes horizontales visibles.
+    # Small gradient enlarged: no visible horizontal bands.
     petit = Image.new("L", (4, 64), 0)
     dessin_p = ImageDraw.Draw(petit)
     for i in range(64):
@@ -374,7 +374,7 @@ def _eclairage(page, graine):
     if direction < 0:
         masque = ImageOps.mirror(masque)
     eclaire = ImageChops.multiply(page, Image.merge("RGB", (masque, masque, masque)))
-    # vignette : les coins sont plus sombres
+    # vignette: the corners are darker
     vignette = Image.new("L", (largeur, hauteur), 0)
     dessin_v = ImageDraw.Draw(vignette)
     rayon = int(max(largeur, hauteur) * 0.72)
@@ -383,13 +383,13 @@ def _eclairage(page, graine):
         fill=255,
     )
     vignette = vignette.filter(ImageFilter.GaussianBlur(rayon // 3))
-    # La vignette assombrit un peu, pas tout : une photo sombre reste lisible.
+    # The vignette darkens a little, not everything: a dark photo stays readable.
     vignette = ImageEnhance.Brightness(vignette).enhance(0.62)
     return ImageChops.multiply(eclaire, Image.merge("RGB", (vignette, vignette, vignette)))
 
 
 def _bruit_et_flou(page, graine):
-    """Grain de capteur et léger flou de mise au point."""
+    """Sensor grain and slight focus blur."""
     alea = random.Random(graine)
     largeur, hauteur = page.size
     bruit = Image.effect_noise((largeur, hauteur), 9).convert("RGB")
@@ -398,7 +398,7 @@ def _bruit_et_flou(page, graine):
 
 
 def _bureau(page, graine):
-    """La page est posée sur une table, avec une ombre portée."""
+    """The page lies on a table, with a cast shadow."""
     alea = random.Random(graine)
     largeur, hauteur = page.size
     marge = int(largeur * 0.06)
@@ -418,7 +418,7 @@ def _bureau(page, graine):
 
 
 def _photographier(page, graine):
-    """Chaîne complète : déformation, lumière, grain, flou, table, angle."""
+    """Full chain: warp, light, grain, blur, table, angle."""
     image = _deformer(page, graine)
     image = _eclairage(image, graine + 1)
     image = _bruit_et_flou(image, graine + 2)
@@ -429,12 +429,12 @@ def _photographier(page, graine):
 def generer_demo(
     source="corpus/copies-demo.json", sortie="corpus/demo", uniquement=None
 ):
-    """Rend les copies de la démo et les « photographie » (JPEG, comme un téléphone).
+    """Renders the demo papers and "photographs" them (JPEG, like a phone).
 
-    `uniquement` liste des ids : ne rend que ceux-là. Utile pour ajouter des
-    copies sans toucher aux photos déjà **enregistrées** dans corpus/reponses —
-    les réponses de la démo sont capturées sur des photos précises, régénérer
-    une photo modifie son grain et rend l'enregistrement périmé.
+    `uniquement` lists ids: render only those. Useful for adding papers without
+    touching the photos already **recorded** in corpus/reponses — demo responses
+    are captured on specific photos, regenerating one changes its grain and
+    makes the recording obsolete.
     """
     donnees = json.loads(pathlib.Path(source).read_text(encoding="utf-8"))
     dossier = pathlib.Path(sortie)
@@ -446,7 +446,7 @@ def generer_demo(
         photo = _photographier(page, 1000 + index)
         chemin = dossier / ("%s.jpg" % copie["id"])
         photo.save(chemin, "JPEG", quality=74)
-        print("%s — %dx%d, %d Ko" % (chemin, photo.size[0], photo.size[1], chemin.stat().st_size // 1024))
+        print("%s — %dx%d, %d KB" % (chemin, photo.size[0], photo.size[1], chemin.stat().st_size // 1024))
 
 
 if __name__ == "__main__":

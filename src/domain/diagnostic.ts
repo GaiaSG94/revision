@@ -1,11 +1,11 @@
 /**
- * Construction du diagnostic à partir des erreurs classifiées.
+ * Builds the diagnosis from the classified errors.
  *
- * Deux garde-fous appliqués ici, avant tout affichage :
- *  1. seuil de confiance (0,6) → en dessous, la faute devient E99 « non typée »
- *     et sort du profil ;
- *  2. copie propre : si le modèle ne rend aucune annotation, on ne fabrique
- *     aucune faute (RNF-04 : zéro faux positif toléré).
+ * Two safeguards applied here, before any display:
+ *  1. confidence threshold (0.6) → below it, the error becomes E99 "untyped"
+ *     and leaves the profile;
+ *  2. clean paper: if the model returns no annotations, no error is fabricated
+ *     (RNF-04: zero false positives tolerated).
  */
 import { CODE_NON_TYPEE, estCodeConnu, estPonderee, libelleDe } from './taxonomy'
 import type { CodeErreur } from './taxonomy'
@@ -22,9 +22,9 @@ export type ErreurBrute = {
 }
 
 /**
- * Normalise une entrée brute en Erreur typée : seuil de confiance appliqué,
- * textes bornés, zone assainie. Les invariants tiennent quel que soit
- * l'appelant (pipeline, seconde passe, ou test).
+ * Normalizes a raw input into a typed Error: confidence threshold applied,
+ * texts bounded, zone sanitized. The invariants hold regardless of the caller
+ * (pipeline, second pass, or test).
  */
 export function normaliserErreur(brute: ErreurBrute): Erreur {
   const confiance = confianceAssainie(brute.confiance)
@@ -41,7 +41,7 @@ export function normaliserErreur(brute: ErreurBrute): Erreur {
   }
 }
 
-/** Type dominant d'une liste d'erreurs : le plus fréquent parmi les pondérées. */
+/** Dominant type of a list of errors: the most frequent among the weighted ones. */
 export function dominantDe(erreurs: Erreur[]): CodeErreur | null {
   const compteurs = new Map<CodeErreur, number>()
   for (const erreur of erreurs) {

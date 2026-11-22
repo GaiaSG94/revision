@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests ciblés de conflict_agent.py — bibliothèque standard uniquement.
+"""Targeted tests for conflict_agent.py — standard library only.
 
 Lance : python3 -m unittest test_conflict_agent -v
 (depuis .github/fireworks/).
@@ -17,7 +17,7 @@ import conflict_agent
 
 
 class EnvOrTest(unittest.TestCase):
-    """Résolution des réglages : une var GitHub absente arrive comme ""."""
+    """Settings resolution: an absent GitHub var arrives as ""."""
 
     def test_var_absente_rend_defaut(self):
         with mock.patch.dict(os.environ):
@@ -26,7 +26,7 @@ class EnvOrTest(unittest.TestCase):
                 conflict_agent.env_or("FIREWORKS_MODEL", "DEFAUT"), "DEFAUT")
 
     def test_var_vide_rend_defaut(self):
-        # Régression 28/10 : modèle "" → 400 Fireworks sur un vrai conflit.
+        # Regression 28/10: model "" → 400 Fireworks on a real conflict.
         with mock.patch.dict(os.environ, {"FIREWORKS_MODEL": ""}):
             self.assertEqual(
                 conflict_agent.env_or("FIREWORKS_MODEL", "DEFAUT"), "DEFAUT")
@@ -38,7 +38,7 @@ class EnvOrTest(unittest.TestCase):
 
 
 class PushUrlTest(unittest.TestCase):
-    """URL push : PAT du CI, repli "origin" en local."""
+    """Push URL: CI PAT, "origin" fallback locally."""
 
     def test_avec_token_rend_url_authentifiee(self):
         with mock.patch.dict(os.environ, {"GH_TOKEN": "T"}):
@@ -53,7 +53,7 @@ class PushUrlTest(unittest.TestCase):
 
 
 class SplitHunksTest(unittest.TestCase):
-    """Découpage des marqueurs : le propre recopié, les bords nommés."""
+    """Marker splitting: clean parts copied, sides named."""
 
     def test_sans_marqueur_tout_propre(self):
         segs = conflict_agent.split_hunks("a\nb\n")
@@ -81,7 +81,7 @@ class SplitHunksTest(unittest.TestCase):
         self.assertEqual(hunk["saved"], ["s"])
 
     def test_rebase_reel_second_bloc_est_branche(self):
-        # Non-régression 28/10 : en rebase, "saved" = branche rejouée.
+        # Non-regression 28/10: during rebase, "saved" = replayed branch.
         repo = tempfile.mkdtemp(prefix="fw-sides-")
         self.addCleanup(shutil.rmtree, repo, True)
         old = os.getcwd()
@@ -118,7 +118,7 @@ class SplitHunksTest(unittest.TestCase):
 
 
 def _scratch_repo(test):
-    """Dépôt git réel en temp, cwd dedans, nettoyé après. Rend run()."""
+    """Real git repo in temp, cwd inside, cleaned afterwards. Returns run()."""
     repo = tempfile.mkdtemp(prefix="fw-loop-")
     test.addCleanup(shutil.rmtree, repo, True)
     old = os.getcwd()
@@ -142,7 +142,7 @@ def _commit(run, files, message):
 
 
 class RebaseLoopTest(unittest.TestCase):
-    """Boucle multi-passes : chaque arrêt est résolu, puis poussé."""
+    """Multi-round loop: each stop is resolved, then pushed."""
 
     def test_rebase_in_progress_suit_le_rebase(self):
         run = _scratch_repo(self)
@@ -162,8 +162,8 @@ class RebaseLoopTest(unittest.TestCase):
         self.assertFalse(conflict_agent.rebase_in_progress())
 
     def test_boucle_deux_arrets(self):
-        # Non-régression 28/10 : #125 a deux commits en conflit, l'ancien
-        # code échouait au premier --continue ("Resolve all conflicts").
+        # Non-regression 28/10: #125 has two conflicting commits, the old
+        # code failed at the first --continue ("Resolve all conflicts").
         run = _scratch_repo(self)
         _commit(run, {"f.txt": "base\n", "g.txt": "base\n"}, "base")
         base_branch = run("branch", "--show-current").stdout.strip()
@@ -188,8 +188,8 @@ class RebaseLoopTest(unittest.TestCase):
         self.assertIn("br2", log)
 
     def test_commit_vide_skip(self):
-        # La résolution reprend le bord main : le commit rejoué est vide,
-        # --continue échoue ("empty") et la boucle le saute.
+        # Resolution takes the main side: the replayed commit is empty,
+        # --continue fails ("empty") and the loop skips it.
         run = _scratch_repo(self)
         _commit(run, {"f.txt": "X\n"}, "base")
         base_branch = run("branch", "--show-current").stdout.strip()
@@ -212,8 +212,8 @@ class RebaseLoopTest(unittest.TestCase):
             self.assertEqual(fh.read().strip(), "Z")
 
     def test_borne_max_rounds(self):
-        # Un conflit qui ne part pas (résolution sans effet) abandonne
-        # après MAX_ROUNDS au lieu de boucler.
+        # A conflict that does not resolve (no-op resolution) gives up
+        # after MAX_ROUNDS instead of looping.
         run = _scratch_repo(self)
         _commit(run, {"f.txt": "base\n"}, "base")
         base_branch = run("branch", "--show-current").stdout.strip()
@@ -230,16 +230,16 @@ class RebaseLoopTest(unittest.TestCase):
             with self.assertRaises(conflict_agent.AgentError) as ctx:
                 conflict_agent.finish_loop("http://x", "K", "M",
                                            time.time() + 60)
-        self.assertIn("arrêts", str(ctx.exception))
+        self.assertIn("stops", str(ctx.exception))
 
 
 class FinishPushTest(unittest.TestCase):
-    """Fin de rebase : un seul push avec bail, puis compte rendu."""
+    """End of rebase: a single push with a lease, then report."""
 
     def test_un_seul_push(self):
-        # Non-régression 29/10 : le push était exécuté deux fois avec le même
-        # bail — le second échouait toujours après un premier succès, et la PR
-        # repartait en « conflit » sans commentaire ni label.
+        # Non-regression 29/10: the push ran twice with the same
+        # lease — the second always failed after a first success, and the PR
+        # went back to "conflict" without a comment or label.
         appels = []
 
         def faux_run(argv, **kw):
@@ -267,10 +267,10 @@ class FinishPushTest(unittest.TestCase):
 
 
 class DryRunStampTest(unittest.TestCase):
-    """Le dry-run n'écrit jamais d'empreinte (ni cooldown ni plafond)."""
+    """Dry-run never writes a fingerprint (no cooldown or cap)."""
 
     def test_dry_run_sans_stamp(self):
-        # Non-régression 29/10 : une simulation touchait l'empreinte avant la
+        # Non-regression 29/10: a simulation touched the fingerprint before the
         # branche dry-run, et bloquait un vrai run pendant 20 min.
         run = _scratch_repo(self)
         _commit(run, {"f.txt": "base\n"}, "base")
@@ -297,7 +297,7 @@ class DryRunStampTest(unittest.TestCase):
 
 
 class UnionSansModeleTest(unittest.TestCase):
-    """Le câblage : un journal se règle sans appeler le modèle."""
+    """Wiring: a log resolves without calling the model."""
 
     def test_finish_loop_union_sans_saisine(self):
         run = _scratch_repo(self)
@@ -312,7 +312,7 @@ class UnionSansModeleTest(unittest.TestCase):
                                 capture_output=True)
         self.assertNotEqual(failed.returncode, 0)
         with mock.patch.object(conflict_agent, "fw_complete",
-                               side_effect=AssertionError("modèle appelé")):
+                               side_effect=AssertionError("model called")):
             resolved = conflict_agent.finish_loop(
                 "http://x", "K", "M", time.time() + 60)
         self.assertEqual(resolved, ["CHANGELOG.md"])
@@ -321,7 +321,7 @@ class UnionSansModeleTest(unittest.TestCase):
 
 
 class TachesCompilationTest(unittest.TestCase):
-    """Quels modules la porte compile pour un diff donné (v3, 31/10)."""
+    """Which modules the gate compiles for a given diff (v3, 31/10)."""
 
     def test_docs_ne_compilent_rien(self):
         self.assertEqual(
@@ -346,29 +346,29 @@ class TachesCompilationTest(unittest.TestCase):
             ([], ["server/backend/x.py"]))
 
     def test_kt_hors_module_gradle_ignore(self):
-        # Aucun `.kt` hors `core/`/`app/` ne se compile seul : le compiler
-        # demanderait un module qui n'existe pas.
+        # No `.kt` outside `core/`/`app/` compiles alone: compiling it
+        # would require a module that does not exist.
         self.assertEqual(
             compilation_gate.taches_compilation(["tools/x.kt",
                                                "build.gradle.kts"]),
             ([], []))
 
 
-MARQUEUR = "<!-- agent-conflit sha=abc123 -->\n\nConflit réconcilié."
+MARQUEUR = "<!-- agent-conflit sha=abc123 -->\n\nConflict reconciled."
 
 
 class PorteCompilationTest(unittest.TestCase):
-    """Une résolution qui ne compile pas n'atteint jamais la branche."""
+    """A resolution that does not compile never reaches the branch."""
 
     def test_desactivee_par_variable(self):
         with mock.patch.dict(os.environ, {"CONFLICT_COMPILE_GATE": "0"}):
             ok, message = compilation_gate.verifier_compilation(["core/a.kt"])
         self.assertTrue(ok)
-        self.assertIn("désactivée", message)
+        self.assertIn("disabled", message)
 
     def test_sans_gradlew_ne_bloque_rien(self):
-        # Un clone sans outillage (test local, ancien déploiement) ne doit pas
-        # empêcher le rebase : la CI reste la preuve.
+        # A clone without tooling (local test, older deployment) must not
+        # prevent the rebase: CI remains the proof.
         tmp = tempfile.mkdtemp()
         ancien = os.getcwd()
         os.chdir(tmp)
@@ -408,9 +408,9 @@ class PorteCompilationTest(unittest.TestCase):
         self.assertIn("Unresolved reference", message)
 
     def test_finish_ne_pousse_pas_un_arbre_casse(self):
-        # Régression 31/10 (#615) : la réconciliation avait poussé une tête
-        # qui ne compilait pas, le balayeur l'a classée « échec réel » et plus
-        # aucun agent n'écrit de correctif de code → PR morte en silence.
+        # Regression 31/10 (#615): reconciliation pushed a head that
+        # did not compile, the sweeper classified it as "real failure" and no
+        # agent wrote a code fix → PR died silently.
         appels = []
 
         def faux_run(argv, **kw):
@@ -426,8 +426,8 @@ class PorteCompilationTest(unittest.TestCase):
         self.assertEqual([a for a in appels if a[:2] == ["git", "push"]], [])
 
     def test_marqueur_de_tete_dans_le_compte_rendu(self):
-        # Le balayeur cherche `<!-- agent-conflit sha=<tête> -->` mot pour mot
-        # pour dire sur un échec réel que la résolution est en cause.
+        # The sweeper looks for `<!-- agent-conflit sha=<head> -->` verbatim
+        # to say on a real failure that the resolution is to blame.
         corps = []
         with mock.patch.object(conflict_agent, "porte_compilation",
                                return_value=(True, "ok", MARQUEUR)), \
@@ -450,26 +450,26 @@ class PorteCompilationTest(unittest.TestCase):
                 ["core/b.kt", "core/a.kt"], "br")
         self.assertTrue(ok)
         self.assertTrue(corps.startswith("<!-- agent-conflit sha=deadbeef -->"))
-        self.assertIn("2 fichier(s) (core/a.kt, core/b.kt)", corps)
+        self.assertIn("2 file(s) (core/a.kt, core/b.kt)", corps)
 
 
 class PlafondFichiersTest(unittest.TestCase):
-    """Plafond de fichiers par passe : 100 (était 8 avant le 01/11)."""
+    """Per-round file cap: 100 (was 8 before 01/11)."""
 
     def test_neuf_fichiers_couverts(self):
-        # Non-régression : un conflit à >8 fichiers était refusé avant.
+        # Non-regression: a conflict with >8 files was refused before.
         fichiers = ["f%02d.txt" % i for i in range(9)]
-        conflict_agent.check_round_files(fichiers)  # ne lève pas
+        conflict_agent.check_round_files(fichiers)  # does not raise
 
     def test_cent_fichiers_couverts(self):
         fichiers = ["f%03d.txt" % i for i in range(100)]
-        conflict_agent.check_round_files(fichiers)  # ne lève pas
+        conflict_agent.check_round_files(fichiers)  # does not raise
 
     def test_cent_un_fichiers_refuses(self):
         fichiers = ["f%03d.txt" % i for i in range(101)]
         with self.assertRaises(conflict_agent.AgentError) as ctx:
             conflict_agent.check_round_files(fichiers)
-        self.assertIn("plafond 100", str(ctx.exception))
+        self.assertIn("cap 100", str(ctx.exception))
 
 
 if __name__ == "__main__":

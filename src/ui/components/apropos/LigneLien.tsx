@@ -4,7 +4,7 @@ export type Lien = { etiquette: string; href: string; detail: string }
 
 type Props = { lien: Lien }
 
-/** Une ligne de la section liens : intitulé cliquable + ce qu'on y trouve. */
+/** A row in the links section: clickable label + what you will find there. */
 export function LigneLien({ lien }: Props) {
   return (
     <li className="rounded-lg border border-bord bg-surface-2 p-3">

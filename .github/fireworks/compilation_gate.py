@@ -1,38 +1,37 @@
 #!/usr/bin/env python3
-"""Porte de compilation de l'agent de conflit (pr-auto-merge).
+"""Compilation gate for the conflict agent (pr-auto-merge).
 
-Une résolution de conflit **ne doit jamais atteindre la branche sans compiler**.
-Motif mesuré le 31/10 (PR #615) : la réconciliation avait poussé une tête
-cassée — paramètre `motion` manquant, variable `hushed` hors portée, un test
-aux arguments inversés —, le balayeur a classé l'échec « réel » (« aucun agent
-n'écrit de correctif de code »), et la PR est morte en silence jusqu'à une
-reprise humaine.
+A conflict resolution **must never reach the branch without compiling**.
+Pattern measured on 31/10 (PR #615): the reconciliation pushed a broken head
+— missing `motion` parameter, `hushed` variable out of scope, a test with
+swapped arguments — the sweeper classified the failure as 'real' ('no agent
+writes a code fix'), and the PR died silently until a human took over.
 
-Ici : on compile les modules touchés (`:core:compileDebugKotlin`,
-`:app:compileDebugKotlin`, `py_compile` pour le serveur) AVANT le push. Rouge
-→ rien n'est poussé, la branche reste intacte, la PR reste `DIRTY` (le tour
-suivant rappelle l'agent, dans la limite du quota) et le compte rendu cite les
-erreurs du compilateur.
+Here: we compile the touched modules (`:core:compileDebugKotlin`,
+`:app:compileDebugKotlin`, `py_compile` for the server) BEFORE the push. Red
+→ nothing is pushed, the branch stays intact, the PR stays `DIRTY` (the next
+round recalls the agent, within the quota limit) and the report quotes the
+compiler errors.
 
-Une porte qui ne peut pas s'exécuter (pas de `gradlew`, pas de SDK Android,
-délai dépassé) ne bloque rien et le dit : le bail de la CI reste la preuve.
-Coupe-circuit : `CONFLICT_COMPILE_GATE=0`.
+A gate that cannot run (no `gradlew`, no Android SDK, timeout) blocks
+nothing and says so: the CI lease remains the proof.
+Circuit breaker: `CONFLICT_COMPILE_GATE=0`.
 
-Bibliothèque standard uniquement, aucune horloge implicite, aucun secret.
+Standard library only, no implicit clock, no secret.
 """
 
 import os
 import subprocess
 import sys
 
-# Un `.kt` hors de ces arbres ne se compile pas seul (`settings.gradle.kts`).
+# A `.kt` outside these trees cannot compile on its own (`settings.gradle.kts`).
 MODULES_GRADLE = ("core", "app")
 GATE_ENV = "CONFLICT_COMPILE_GATE"
 GATE_TIMEOUT_S = 150
 GATE_EXCERPT = 1_500
-# Marqueur de la tête posée par l'agent : le balayeur le cherche mot pour mot
-# pour attribuer un échec à la résolution (label `intervention-humaine`) au
-# lieu de laisser la PR mourir en silence.
+# Marker of the head set by the agent: the sweeper looks for it verbatim to
+# attribute a failure to the resolution (label `intervention-humaine`) instead
+# of letting the PR die silently.
 MARK_AGENT = "<!-- agent-conflit sha=%s -->"
 
 
@@ -41,25 +40,25 @@ def _log(message):
 
 
 def fichiers_modifies(base="origin/main"):
-    """Fichiers que la branche change par rapport à `base` (best-effort)."""
+    """Files the branch changes relative to `base` (best-effort)."""
     try:
         proc = subprocess.run(["git", "diff", "--name-only", "%s...HEAD" % base],
                               capture_output=True, text=True, timeout=120)
     except (OSError, subprocess.SubprocessError) as exc:
-        _log("diff illisible, rien à compiler : %s" % exc)
+        _log("unreadable diff, nothing to compile: %s" % exc)
         return []
     if proc.returncode != 0:
-        _log("diff illisible (%s), rien à compiler" % base)
+        _log("unreadable diff (%s), nothing to compile" % base)
         return []
     return [line for line in (proc.stdout or "").splitlines() if line.strip()]
 
 
 def taches_compilation(fichiers):
-    """(tâches Gradle, fichiers Python) à vérifier pour ces chemins.
+    """(Gradle tasks, Python files) to check for these paths.
 
-    Un `.kt` sous `core/` ou `app/` demande la compilation de son module ; un
-    `.py` se vérifie seul (`py_compile`). Tout le reste (docs, JSON, `.kts`,
-    arbres non Gradle) ne prouve rien et n'est pas compilé ici.
+    A `.kt` under `core/` or `app/` requires compiling its module; a
+    `.py` is checked on its own (`py_compile`). Everything else (docs, JSON,
+    `.kts`, non-Gradle trees) proves nothing and is not compiled here.
     """
     gradle, python = [], []
     for path in fichiers:
@@ -76,7 +75,7 @@ def taches_compilation(fichiers):
 
 
 def sdk_android():
-    """SDK Android, ou `None` : sans lui Gradle refuse de se configurer."""
+    """Android SDK, or `None`: without it Gradle refuses to configure."""
     for var in ("ANDROID_HOME", "ANDROID_SDK_ROOT"):
         chemin = os.environ.get(var)
         if chemin and os.path.isdir(chemin):
@@ -86,16 +85,16 @@ def sdk_android():
 
 
 def ecrire_local_properties(sdk):
-    """`local.properties` (gitignoré) : le clone du balayeur n'en a pas."""
+    """`local.properties` (gitignored): the sweeper's clone does not have it."""
     try:
         with open("local.properties", "w", encoding="utf-8") as fichier:
             fichier.write("sdk.dir=%s\n" % sdk)
     except OSError as exc:
-        _log("local.properties non écrit : %s" % exc)
+        _log("local.properties not written: %s" % exc)
 
 
 def extrait_compilateur(etape, texte):
-    """Extrait publiable : les lignes d'erreur, sinon la fin du journal."""
+    """Publishable excerpt: error lines, otherwise the end of the log."""
     lignes = [ligne.strip() for ligne in texte.splitlines() if ligne.strip()]
     fautes = [ligne for ligne in lignes
               if ligne.startswith("e: ") or "error:" in ligne
@@ -105,30 +104,30 @@ def extrait_compilateur(etape, texte):
 
 
 def verifier_compilation(fichiers=None):
-    """Compile les modules touchés avant le push. Rend (ok, message).
+    """Compiles the touched modules before the push. Returns (ok, message).
 
-    `ok` faux n'est pas une panne : c'est la preuve que la résolution est
-    cassée, donc le push est refusé et la branche reste intacte.
+    `ok` false is not a failure: it is proof that the resolution is
+    broken, so the push is refused and the branch stays intact.
     """
     if os.environ.get(GATE_ENV, "1") == "0":
-        return True, "porte de compilation désactivée (%s=0)" % GATE_ENV
+        return True, "compilation gate disabled (%s=0)" % GATE_ENV
     if not os.path.exists("gradlew"):
-        return True, "porte de compilation sautée : pas de `gradlew` ici"
+        return True, "compilation gate skipped: no `gradlew` here"
     fichiers = fichiers_modifies() if fichiers is None else fichiers
     gradle, python = taches_compilation(fichiers)
     if not gradle and not python:
-        return True, "porte de compilation : aucun module touché"
+        return True, "compilation gate: no touched module"
     for path in python:
         try:
             proc = subprocess.run([sys.executable, "-m", "py_compile", path],
                                   capture_output=True, text=True, timeout=60)
         except (OSError, subprocess.SubprocessError) as exc:
-            return True, "porte de compilation sautée (Python) : %s" % exc
+            return True, "compilation gate skipped (Python): %s" % exc
         if proc.returncode != 0:
             return False, extrait_compilateur("Python %s" % path,
                                               proc.stderr or proc.stdout)
     if not gradle:
-        return True, "porte de compilation : Python OK"
+        return True, "compilation gate: Python OK"
     sdk = sdk_android()
     if sdk:
         ecrire_local_properties(sdk)
@@ -138,19 +137,19 @@ def verifier_compilation(fichiers=None):
         proc = subprocess.run(commande, capture_output=True, text=True,
                               timeout=GATE_TIMEOUT_S)
     except subprocess.TimeoutExpired:
-        return True, ("porte de compilation non concluante : %d s dépassées "
+        return True, ("compilation gate inconclusive: %d s exceeded "
                       "(%s)" % (GATE_TIMEOUT_S, " ".join(gradle)))
     except (OSError, subprocess.SubprocessError) as exc:
-        return True, "porte de compilation sautée : %s" % exc
+        return True, "compilation gate skipped: %s" % exc
     if proc.returncode == 0:
-        return True, "porte de compilation : %s OK" % " ".join(gradle)
+        return True, "compilation gate: %s OK" % " ".join(gradle)
     return False, extrait_compilateur(" ".join(gradle),
                                       (proc.stdout or "") + "\n"
                                       + (proc.stderr or ""))
 
 
 def tete_git():
-    """SHA de la tête (le push ne la change pas : marqueur exact)."""
+    """SHA of the head (the push does not change it: exact marker)."""
     try:
         proc = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
                               text=True, timeout=60)
@@ -160,17 +159,17 @@ def tete_git():
 
 
 def prepare_push(files, branch, fichiers=None):
-    """(ok, message, corps) : décide du push et prépare son compte rendu.
+    """(ok, message, body): decides the push and prepares its report.
 
-    Le corps porte le marqueur de tête en première ligne ; l'appelant ne le
-    poste qu'après un push réussi.
+    The body carries the head marker on the first line; the caller only posts
+    it after a successful push.
     """
     ok, message = verifier_compilation(fichiers)
     if not ok:
         return False, message, ""
     unique = sorted(set(files))
-    corps = ("%s\n\nConflit réconcilié par l'agent : %d fichier(s) (%s), "
-             "rebase poussé sur `%s` (%s). La file reprend."
+    corps = ("%s\n\nConflict reconciled by the agent: %d file(s) (%s), "
+             "rebase pushed to `%s` (%s). The queue resumes."
              % (MARK_AGENT % tete_git(), len(unique), ", ".join(unique),
                 branch, message))
     return True, message, corps

@@ -1,10 +1,10 @@
-﻿name: ci-budget (â‰¤ 5 min)
+﻿name: ci-budget (≤ 5 min)
 
-# RÃ¨gle user 2026-10-24 : toute CI rend son verdict en 5 min au plus.
-# Ce workflow est un garde-fou de configuration, pas un test applicatif :
-# il Ã©choue si un job dÃ©clare plus de 5 minutes (ou aucun timeout).
-# Il tourne sur chaque PR pour que le check `ci-budget` existe toujours
-# (condition de file Mergify) â€” coÃ»t : quelques secondes.
+# User rule 2026-10-24: all CI must give its verdict within 5 min.
+# This workflow is a configuration guard, not an application test:
+# it fails if a job declares more than 5 minutes (or no timeout).
+# It runs on every PR so that the `ci-budget` check always exists
+# (Mergify queue condition) — cost: a few seconds.
 
 on:
   pull_request:
@@ -25,10 +25,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Checkout (superficiel)
+      - name: Shallow checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
           persist-credentials: false
-      - name: VÃ©rifier le budget de 5 min par job
+      - name: Check the 5 min budget per job
         run: python3 .github/ci-budget/check_timeouts.py

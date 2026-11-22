@@ -1,11 +1,11 @@
 import { Bouton } from './Bouton'
-import { useRature } from '../../etat/useRature'
+import { useRature } from '../../etat/useRevision'
 
 /**
- * Bandeau « amont indisponible » — lot 2. On n'échoue pas devant un juge : on
- * annonce la panne et on propose la démonstration, qui ne dépend ni du réseau
- * ni de la place de marché du modèle. Honnêteté : on ne remplace JAMAIS la
- * photo de l'utilisateur par la démo — le clic reste explicite.
+ * "Upstream unavailable" banner — batch 2. We do not fail in front of a judge:
+ * we announce the outage and offer the demo, which depends neither on the
+ * network nor on the model marketplace. Honesty: we NEVER replace the user's
+ * photo with the demo — the click stays explicit.
  */
 export function BandeauSante() {
   const { santeProxy, analyserDemo, occupe, aller } = useRature()

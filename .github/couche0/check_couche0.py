@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""Couche 0 anti-régression — périmètre déclaré + motifs interdits.
+"""Layer 0 anti-regression — declared scope + forbidden patterns.
 
-Deux contrôles seulement, bibliothèque standard uniquement.
+Only two checks, standard library only.
 
-  scope      tout fichier modifié doit être déclaré dans la section `## Scope`
-             du corps de la PR — et toute déclaration doit servir.
-  forbidden  motifs refusés dans les lignes AJOUTÉES du diff, quel que soit le
-             périmètre déclaré ; les fichiers de garde sont gelés.
+  scope      every modified file must be declared in the PR body's `## Scope`
+             section — and every declaration must be used.
+  forbidden  patterns refused in ADDED diff lines, whatever the declared
+             scope; guard files are frozen.
 
-Usage : check_couche0.py check --pr N [--repo owner/name] [--control scope|forbidden]
-Codes de sortie : 0 = OK, 1 = contrôle(s) en échec, 2 = erreur interne.
+Usage: check_couche0.py check --pr N [--repo owner/name] [--control scope|forbidden]
+Exit codes: 0 = OK, 1 = failed check(s), 2 = internal error.
 """
 
 import argparse
@@ -24,40 +24,40 @@ API = os.environ.get("GITHUB_API_URL", "https://api.github.com")
 MAX_PAGES = 20
 MAX_ERREURS_AFFICHEES = 12
 
-# Fichiers de garde : les modifier exige une mention explicite dans le corps.
+# Guard files: modifying them requires an explicit mention in the body.
 GUARD_FILES = (".github/ci-budget/", ".github/couche0/",
                ".github/workflows/couche0.yml",
-               # Fermé le 26/10 : sans ça une PR pouvait retirer les tests du job
-               # `ci` sans le déclarer — la porte ouverte derrière la garde.
-               # Même motif le 29/10 pour le natif hors PR et la file de merge :
-               # vider `lint`/`apk-release` ou l'auto-merge passerait inaperçu.
-               # (`ci-budget.yml` retiré le 31/10 : le garde-fou est un job de
-               # `ci.yml` depuis le 29/10, le fichier n'existe plus.)
+               # Closed on 26/10: without it a PR could remove the tests from the `ci`
+               # job without declaring it — the door left open behind the guard.
+               # Same pattern on 29/10 for non-PR native and the merge queue:
+               # emptying `lint`/`apk-release` or auto-merge would go unnoticed.
+               # (`ci-budget.yml` removed on 31/10: the guard has been a job of
+               # `ci.yml` since 29/10, the file no longer exists.)
                ".github/workflows/ci.yml", ".github/workflows/ci-native.yml",
                ".github/workflows/pr-auto-merge.yml")
 GUARD_FLAG = "SAMVISION_ALLOW_GUARD_BUMP"
 
-# Exemptés de déclaration de périmètre : régénérable ou non signé.
+# Exempt from scope declaration: regenerable or unsigned.
 EXEMPT_SUBSTR = ("/build/", "gradle/wrapper/", ".gradle/")
 EXEMPT_SUFFIX = (".lock", ".png", ".webp", ".jpg", ".xml.bak")
 
-# Troisième élément : sous-chaîne qui exempte la ligne (faux positif documenté).
+# Third element: substring that exempts the line (documented false positive).
 FORBIDDEN_PATTERNS = [
-    (r"-X\s+(ours|theirs)\b", "prise de côté forcée (-X ours/theirs)", None),
-    (r"--force(?!-with-lease)\b", "push forcé sans --force-with-lease",
-     "modal secret create"),  # faux positif : écrasement idempotent du secret Modal
-    (r"pull_request_target", "déclencheur à privilèges pull_request_target", None),
-    (r"sk-[A-Za-z0-9_\-]{24,}", "clé API sk-… en clair", None),
-    (r"sk_[a-f0-9]{32}", "clé API sk_… en clair", None),
-    (r"ghp_[A-Za-z0-9]{36}", "jeton GitHub ghp_… en clair", None),
-    (r"^sdk\.dir=", "sdk.dir en dur (local.properties ne se versionne pas)", None),
+    (r"-X\s+(ours|theirs)\b", "forced side choice (-X ours/theirs)", None),
+    (r"--force(?!-with-lease)\b", "forced push without --force-with-lease",
+     "modal secret create"),  # false positive: idempotent overwrite of the Modal secret
+    (r"pull_request_target", "privileged trigger pull_request_target", None),
+    (r"sk-[A-Za-z0-9_\-]{24,}", "plaintext sk-… API key", None),
+    (r"sk_[a-f0-9]{32}", "plaintext sk_… API key", None),
+    (r"ghp_[A-Za-z0-9]{36}", "plaintext ghp_… GitHub token", None),
+    (r"^sdk\.dir=", "hardcoded sdk.dir (local.properties must not be versioned)", None),
     (r"2026-10-2[0-5]\b|\b2[0-5]/10\b",
-     "date antérieure au 26/10 19 h (citer « relevé antérieur, hors de cet arbre »)", None),
+     "date earlier than 26/10 7 p.m. (cite 'earlier reading, outside this tree')", None),
 ]
 
 
 def api_get(path, token):
-    """GET sur l'API GitHub, retourne du JSON décodé."""
+    """GET on the GitHub API, returns decoded JSON."""
     req = urllib.request.Request(API + path)
     req.add_header("Authorization", "bearer " + token)
     req.add_header("Accept", "application/vnd.github+json")
@@ -67,7 +67,7 @@ def api_get(path, token):
 
 
 def pr_context(repo, number, token):
-    """Récupère (corps de la PR, liste des fichiers modifiés)."""
+    """Fetches (PR body, list of modified files)."""
     pr = api_get("/repos/%s/pulls/%s" % (repo, number), token)
     files, page = [], 1
     while page <= MAX_PAGES:
@@ -81,7 +81,7 @@ def pr_context(repo, number, token):
 
 
 def parse_scope(body):
-    r"""Motifs déclarés dans `## Scope` (puces `- \`motif\` — raison`)."""
+    r"""Patterns declared in `## Scope` (bullets `- \`pattern\` — reason`)."""
     patterns, inside = [], False
     for line in body.splitlines():
         if line.strip().lower().startswith("## scope"):
@@ -98,7 +98,7 @@ def parse_scope(body):
 
 
 def matches(pattern, path):
-    """Un motif désigne un fichier : exact, dossier (préfixe), ou glob."""
+    """A pattern designates a file: exact, folder (prefix), or glob."""
     if pattern == path:
         return True
     if pattern.endswith("/"):
@@ -109,18 +109,18 @@ def matches(pattern, path):
 
 
 def is_exempt(path):
-    """Fichiers régénérables : pas besoin de les déclarer."""
+    """Regenerable files: no need to declare them."""
     return any(s in path for s in EXEMPT_SUBSTR) or path.endswith(EXEMPT_SUFFIX)
 
 
 def suggerer_scope(files):
-    """Motifs prêts à coller dans `## Scope`, groupés quand le glob est évident.
+    """Patterns ready to paste into `## Scope`, grouped when the glob is obvious.
 
-    Un refus sans rien à copier coûte des minutes (aller-retour humain ou agent
-    Fireworks, puis un nouveau run) : ici le garde ne s'assouplit pas, il rend
-    la déclaration faisable en un copier-coller. Trois fichiers ou plus du même
-    dossier et de même extension deviennent `dossier/*.ext` — `matches()` sait
-    déjà le lire.
+    A refusal with nothing to copy costs minutes (human or Fireworks agent
+    round trip, then a new run): here the guard does not loosen, it makes the
+    declaration possible with a copy-paste. Three or more files from the same
+    folder with the same extension become `folder/*.ext` — `matches()` already
+    knows how to read that.
     """
     groupes, ordre = {}, []
     for f in files:
@@ -146,43 +146,43 @@ def suggerer_scope(files):
 
 
 def bloc_scope(files):
-    """Le bloc markdown à coller dans le corps de la PR."""
+    """The markdown block to paste into the PR body."""
     motifs = suggerer_scope(files)
     if not motifs:
         return ""
     lignes = ["## Scope", ""]
-    lignes += ["- `%s` — à préciser" % m for m in motifs]
+    lignes += ["- `%s` — to specify" % m for m in motifs]
     return "\n".join(lignes)
 
 
 def publier_suggestion(files):
-    """Écrit le bloc dans le résumé du job (et dans le log) : copiable."""
+    """Writes the block to the job summary (and the log): copyable."""
     bloc = bloc_scope(files)
     if not bloc:
         return
-    print("Périmètre déclarable tel quel dans le corps de la PR :")
+    print("Scope that can be declared as-is in the PR body:")
     print(bloc)
     resume = os.environ.get("GITHUB_STEP_SUMMARY")
     if not resume:
         return
     try:
         with open(resume, "a", encoding="utf-8") as fh:
-            fh.write("### Périmètre à déclarer\n\n"
-                     "Ce bloc, collé dans le corps de la PR, rend `couche0` vert "
-                     "(relancer le workflow sans nouveau commit suffit ensuite).\n\n"
+            fh.write("### Scope to declare\n\n"
+                     "This block, pasted into the PR body, makes `couche0` green "
+                     "(re-running the workflow without a new commit then suffices).\n\n"
                      "```markdown\n%s\n```\n" % bloc)
     except OSError:
         pass
 
 
 def check_scope(files, body, errors):
-    """Tout fichier modifié déclaré, toute déclaration servie."""
+    """Every modified file declared, every declaration used."""
     declared = parse_scope(body)
     paths = [f["filename"] for f in files if not is_exempt(f["filename"])]
     if not declared:
         if paths:
-            errors.append("scope : aucune section `## Scope` dans le corps de la "
-                          "PR, alors que %d fichier(s) sont modifiés." % len(paths))
+            errors.append("scope: no `## Scope` section in the PR body, "
+                          "while %d file(s) are modified." % len(paths))
         return
     used = set()
     for path in paths:
@@ -190,15 +190,15 @@ def check_scope(files, body, errors):
         if hit:
             used.update(hit)
         else:
-            errors.append("scope : `%s` modifié mais non déclaré dans `## Scope`." % path)
+            errors.append("scope: `%s` modified but not declared in `## Scope`." % path)
     unused = [p for p in declared if p not in used]
     if unused:
-        errors.append("scope : déclaration(s) inutilisée(s) — périmètre surdimensionné : %s"
+        errors.append("scope: unused declaration(s) — oversized scope: %s"
                       % ", ".join("`%s`" % p for p in unused))
 
 
 def added_lines(files):
-    """Lignes ajoutées du diff, par fichier (en-têtes de fichier exclus)."""
+    """Added lines of the diff, per file (file headers excluded)."""
     for f in files:
         for line in (f.get("patch") or "").splitlines():
             if line.startswith("+") and not line.startswith("+++"):
@@ -206,22 +206,22 @@ def added_lines(files):
 
 
 def check_forbidden(files, body, errors):
-    """Motifs interdits dans les lignes ajoutées + fichiers de garde gelés."""
+    """Forbidden patterns in added lines + frozen guard files."""
     compiled = [(re.compile(p, re.M), m, x) for p, m, x in FORBIDDEN_PATTERNS]
     for path, line in added_lines(files):
-        # Le garde se cite lui-même (motifs, exemples) : il est déjà gelé
-        # plus bas (GUARD_FLAG), donc hors du scan de motifs.
+        # The guard cites itself (patterns, examples): it is already frozen
+        # below (GUARD_FLAG), so outside the pattern scan.
         if path.startswith(".github/couche0/"):
             continue
         for rx, message, exempt in compiled:
             if exempt and exempt in line:
                 continue
             if rx.search(line):
-                errors.append("forbidden : %s — `%s` dans %s" % (message, line.strip()[:90], path))
+                errors.append("forbidden: %s — `%s` in %s" % (message, line.strip()[:90], path))
     frozen = [f["filename"] for f in files if f["filename"].startswith(GUARD_FILES)]
     if frozen and GUARD_FLAG not in body:
-        errors.append("forbidden : fichier(s) de garde modifié(s) sans la mention `%s` "
-                      "dans le corps : %s" % (GUARD_FLAG, ", ".join(frozen)))
+        errors.append("forbidden: guard file(s) modified without the `%s` mention "
+                      "in the body: %s" % (GUARD_FLAG, ", ".join(frozen)))
 
 
 def main(argv=None):
@@ -233,12 +233,12 @@ def main(argv=None):
     args = ap.parse_args(argv)
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
     if not args.repo or not token:
-        print("::error::GITHUB_REPOSITORY et GITHUB_TOKEN sont requis")
+        print("::error::GITHUB_REPOSITORY and GITHUB_TOKEN are required")
         return 2
     try:
         body, files = pr_context(args.repo, args.pr, token)
     except Exception as exc:                         # noqa: BLE001
-        print("::error::API GitHub : %s" % exc)
+        print("::error::GitHub API: %s" % exc)
         return 2
     errors = []
     if args.control in (None, "scope"):
@@ -247,16 +247,16 @@ def main(argv=None):
             publier_suggestion(files)
     if args.control in (None, "forbidden"):
         check_forbidden(files, body, errors)
-    # Un refus peut lister 38 fichiers : le log devient illisible et noie la
-    # cause. Les douze premiers suffisent à comprendre ; le résumé du job
-    # porte le bloc complet à coller (publier_suggestion).
+    # A refusal can list 38 files: the log becomes unreadable and drowns the
+    # cause. The first twelve are enough to understand; the job summary holds
+    # the complete block to paste (publier_suggestion).
     for message in errors[:MAX_ERREURS_AFFICHEES]:
         print("::error::%s" % message)
     if len(errors) > MAX_ERREURS_AFFICHEES:
-        print("::error::… et %d autre(s) — bloc `## Scope` complet dans le "
-              "résumé du job." % (len(errors) - MAX_ERREURS_AFFICHEES))
-    print("%s — %d fichier(s) controlé(s), %d erreur(s)"
-          % ("OK" if not errors else "REFUSÉ", len(files), len(errors)))
+        print("::error::… and %d more — full `## Scope` block in the "
+              "job summary." % (len(errors) - MAX_ERREURS_AFFICHEES))
+    print("%s — %d file(s) checked, %d error(s)"
+          % ("OK" if not errors else "REJECTED", len(files), len(errors)))
     return 1 if errors else 0
 
 

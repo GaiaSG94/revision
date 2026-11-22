@@ -1,10 +1,10 @@
-﻿name: stale-base-guard (informatif)
+﻿name: stale-base-guard (informational)
 
-# [HERMES-REFRESH] Portage du stale-base-guard du dÃ©pÃ´t duello.
-# Un retard sur main est INFORMATIF : warning + exit 0. Le gate
-# (hermes-lite.yml) rafraÃ®chit la branche par l'API au moment du merge.
-# Si le dÃ©pÃ´t met ce check en Â« requis Â» dans la protection de branche,
-# il reste vert sur un simple retard : seul un vrai conflit bloque.
+# [HERMES-REFRESH] Port of the stale-base-guard from the duello repo.
+# Falling behind main is INFORMATIONAL: warning + exit 0. The gate
+# (hermes-lite.yml) refreshes the branch via the API at merge time.
+# If the repo makes this check 'required' in branch protection,
+# it stays green on a simple lag: only a real conflict blocks.
 
 on:
   pull_request:
@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       pr_number:
-        description: 'NumÃ©ro de PR'
+        description: 'PR number'
         required: true
 
 permissions:
@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Mesurer le retard sur la base
+      - name: Measure how far behind the base
         env:
           PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr_number }}
           GH_TOKEN: ${{ github.token }}
@@ -47,6 +47,6 @@ jobs:
             | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('behind_by', 0))")
           echo "behind=${BEHIND} base=${BASE}" >> "$GITHUB_OUTPUT" || true
           if [ "$BEHIND" -gt 0 ]; then
-            echo "::warning::La branche est en retard de ${BEHIND} commit(s) sur ${BASE} (information : hermes-lite la rafraÃ®chit automatiquement au moment du merge)."
+            echo "::warning::Branch is behind by ${BEHIND} commit(s) on ${BASE} (informational: hermes-lite refreshes it automatically at merge time)."
           fi
           exit 0

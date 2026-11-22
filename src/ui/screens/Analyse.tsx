@@ -3,12 +3,12 @@ import { Bouton } from '../components/Bouton'
 import { EtapesPipeline } from '../components/EtapesPipeline'
 import { Carte } from '../components/Carte'
 import { origineDemo } from '../../pipeline/demo'
-import { useRature } from '../../etat/useRature'
+import { useRature } from '../../etat/useRevision'
 
 /**
- * Écran 3 : la progression nominale des six étapes. On ne montre pas un
- * spinner muet : l'attente devient une démonstration du pipeline (critère
- * Presentation), et le budget annoncé est celui du cahier des charges.
+ * Screen 3: the normal progress of the six steps. We do not show a silent
+ * spinner: waiting becomes a demonstration of the pipeline (Presentation
+ * criterion), and the announced budget is the one from the spec.
  */
 export function Analyse() {
   const {

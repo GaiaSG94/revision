@@ -152,15 +152,15 @@ body {
   animation: balance 4s ease-in-out infinite;
 }
 
-.errata-home {
-  --errata-ink: var(--color-texte);
+.revision-home {
+  --revision-ink: var(--color-texte);
   padding: 0 0 1.5rem;
   color: white;
   position: relative;
 }
 
-/* Trame de points : sur TOUTE la page (fixe, bord à bord). Aucun bleu pur,
-   même dans les marges. Deux couches : demi-teinte fine + gros points. */
+/* Dot grid: across the WHOLE page (fixed, edge to edge). No pure blue,
+   even in the margins. Two layers: a fine halftone + large dots. */
 body::before,
 body::after {
   content: '';
@@ -191,12 +191,12 @@ body::after {
   mask-image: radial-gradient(64% 58% at 30% 46%, transparent, black 80%);
 }
 
-.errata-home > * {
+.revision-home > * {
   position: relative;
   z-index: 1;
 }
 
-.errata-hero {
+.revision-hero {
   display: grid;
   grid-template-columns: minmax(0, 0.88fr) minmax(0, 1.12fr);
   align-items: center;
@@ -205,60 +205,60 @@ body::after {
   padding: 1.5rem 0;
 }
 
-.errata-hero-copy {
+.revision-hero-copy {
   position: relative;
   z-index: 1;
   max-width: 40rem;
   text-align: left;
 }
 
-.errata-hero-kicker {
+.revision-hero-kicker {
   margin: 0 0 0.75rem;
   color: white;
   font-size: 0.9rem;
   font-weight: 500;
 }
 
-.errata-hero h1 {
+.revision-hero h1 {
   margin: 1rem 0 0;
   color: white;
   font-size: clamp(3rem, 6.2vw, 6.5rem);
   text-shadow: 0.3rem 0.3rem 0 var(--color-texte);
 }
 
-.errata-hero .mot-italique {
+.revision-hero .mot-italique {
   color: var(--color-ambre);
 }
 
-.errata-hero-lede {
+.revision-hero-lede {
   max-width: 34rem;
   margin: 1.25rem 0 0;
   color: rgb(255 255 255 / 0.92);
   font-size: 1rem;
 }
 
-.errata-proof-stickers {
+.revision-proof-stickers {
   margin-top: 1.25rem;
 }
 
-.errata-proof-stickers .sticker {
+.revision-proof-stickers .sticker {
   font-size: 0.72rem;
   box-shadow: 3px 3px 0 var(--color-texte);
 }
 
-.errata-home-lower {
+.revision-home-lower {
   display: grid;
   gap: 0.8rem;
   padding-top: 0.5rem;
 }
 
-.errata-home-lower > .rounded-xl {
+.revision-home-lower > .rounded-xl {
   background: var(--color-surface);
 }
 
-/* Écrans internes : une feuille de papier posée sur le bureau bleu. L'accueil
-   reste à même le bureau (son .errata-home est exclu). */
-main.errata-zone > :not(.errata-home) {
+/* Inner screens: a sheet of paper lying on the blue desk. The home screen
+   stays on the bare desk (its .revision-home is excluded). */
+main.revision-zone > :not(.revision-home) {
   background: var(--color-fond);
   border: 3px solid var(--color-texte);
   border-radius: 1.25rem;
@@ -268,36 +268,36 @@ main.errata-zone > :not(.errata-home) {
 }
 
 @media (max-width: 900px) {
-  .errata-hero {
+  .revision-hero {
     grid-template-columns: 1fr;
     min-height: auto;
     text-align: center;
   }
 
-  .errata-hero-copy {
+  .revision-hero-copy {
     margin: 0 auto;
     text-align: center;
   }
 
-  .errata-hero-lede {
+  .revision-hero-lede {
     margin-right: auto;
     margin-left: auto;
   }
 
-  .errata-proof-stickers {
+  .revision-proof-stickers {
     justify-content: center;
   }
 }
 
 @media (max-width: 620px) {
-  .errata-hero {
+  .revision-hero {
     padding-top: 1.2rem;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .errata-ctas > *,
-  .errata-duo-onglet {
+  .revision-ctas > *,
+  .revision-duo-onglet {
     transition: none;
   }
 }

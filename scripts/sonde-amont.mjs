@@ -1,12 +1,12 @@
-// Test capacité amont via le worker (aucune clé ici : elle vit côté Worker).
-const PROXY = 'https://errata-proxy.rature.workers.dev/analyze'
+// Test upstream capacity via the worker (no key here: it lives on the Worker side).
+const PROXY = 'https://revision-proxy.workers.dev/analyze'
 const body = {
   model: 'ag/gemini-4-carbon',
   messages: [
     { role: 'system', content: 'Answer with one word.' },
     { role: 'user', content: 'Say OK.' },
   ],
-  temperature: 0.2,
+  temperevision: 0.2,
   max_tokens: 20,
 }
 const t = Date.now()
@@ -20,5 +20,5 @@ try {
   console.log('HTTP', r.status, `${Date.now() - t}ms`)
   console.log((await r.text()).slice(0, 400))
 } catch (e) {
-  console.log('ERREUR', e.name, e.message, `${Date.now() - t}ms`)
+  console.log('ERROR', e.name, e.message, `${Date.now() - t}ms`)
 }

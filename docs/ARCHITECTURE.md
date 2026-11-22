@@ -1,123 +1,119 @@
 # Architecture
 
-## Vue d'ensemble
+## Overview
 
 ```
-[Navigateur]                        [Edge]                    [InferHub]
- Webapp statique  ── HTTPS ──▶  Proxy (Worker / fonction) ──▶  API [OI]-compatible
-       │                          clé cachée, quota,            vision + raisonnement
-       │                          journal minimal
-       └── IndexedDB : diagnostics, profil, réglages (jamais l'image)
+[Browser]                        [Edge]                    [InferHub]
+ Static webapp  ── HTTPS ──▶  Proxy (Worker / function) ──▶  [OI]-compatible API
+       │                         hidden key, quota,           vision + reasoning
+       │                         minimal logging
+       └── IndexedDB: diagnostics, profile, settings (never the image)
 ```
 
-Trois modes d'accès au modèle, dans l'ordre de préférence :
+There are three ways to reach a model, in order of preference:
 
-1. **Proxy edge** — la clé `INFERHUB_API_KEY` reste côté serveur (`api/analyze.ts` pour Vercel,
-   `worker/worker.js` pour Cloudflare). Sans proxy, n'importe qui consomme le quota.
-2. **BYOK** — l'utilisateur colle sa clé ; elle part dans l'en-tête `x-rature-cle`, reste sur
-   l'appareil et remplace la clé serveur. C'est le filet de sécurité du jour du jugement.
-3. **Corpus de démo** — `corpus/fixtures.ts` rejoue des réponses enregistrées, sans clé ni réseau :
-   les tests et la démonstration hors ligne passent par là.
+1. **Edge proxy** — the `INFERHUB_API_KEY` stays server-side (`api/analyze.ts` for Vercel,
+   `worker/worker.js` for Cloudflare). Without a proxy, anyone can consume the quota.
+2. **BYOK** — the user pastes their own key; it is sent in the `x-revision-cle` header, stays on
+   the device and replaces the server key. This is the safety net for judging day.
+3. **Demo corpus** — `corpus/fixtures.ts` replays recorded answers, with no key and no network:
+   tests and the offline demonstration use this path.
 
-## Les quatre choix structurants
+## The four structural choices
 
-| Choix | Conséquence |
+| Choice | Consequence |
 |---|---|
-| Zéro backend de données | Pas de base, pas d'auth, pas de RGPD serveur. L'historique vit dans IndexedDB |
-| Un proxy edge minimal | La clé n'est jamais dans le bundle ; le quota est borné |
-| Webapp statique | Déploiement en une commande, disponibilité 24h/24 pendant le jugement |
-| BYOK en secours | Un juge peut tester même si le quota partagé est épuisé |
+| No data backend | No database, no auth, no server-side GDPR obligations. History lives in IndexedDB |
+| A minimal edge proxy | The key never enters the bundle; the quota is bounded |
+| Static webapp | One-command deployment, 24/7 availability during judging |
+| BYOK as a fallback | A judge can test even if the shared quota is exhausted |
 
-## Le pipeline, étape par étape
+## The pipeline, step by step
 
-| # | Étape | Fichier | Entrée | Sortie | Budget |
+| # | Step | File | Input | Output | Budget |
 |---|---|---|---|---|---|
-| 1 | Ingest | `src/pipeline/ingest.ts` | `File` | data URL 1600 px, contraste étiré | < 300 ms |
-| 2 | Anonymise | `src/pipeline/anonymize.ts` | data URL | data URL, bandeau du nom pixelisé | < 500 ms |
-| 3+4 | Extrait **et** type | `src/pipeline/analyse.ts` (1 seul appel vision) | data URL | `Extraction` + `Erreur[]` typées | < 20 s |
-| 4 bis | Seconde passe | `src/pipeline/revue.ts` | fautes de confiance < 0,75 | codes confirmés / reclassés / E99 | < 5 s |
-| 5 | Agrège | `src/domain/profil.ts` | erreurs + historique | `Profil` (récurrence, évolution) | < 50 ms |
-| 6 | Génère | `src/pipeline/exercise.ts` | type dominant | `ExerciceVerifie` ou message honnête | < 6 s |
+| 1 | Ingest | `src/pipeline/ingest.ts` | `File` | 1600 px data URL, contrast stretched | < 300 ms |
+| 2 | Anonymise | `src/pipeline/anonymize.ts` | data URL | data URL, name banner pixelated | < 500 ms |
+| 3+4 | Extract **and** type | `src/pipeline/analyse.ts` (single vision call) | data URL | `Extraction` + typed `Erreur[]` | < 20 s |
+| 4b | Second pass | `src/pipeline/revue.ts` | mistakes with confidence < 0.75 | codes confirmed / reclassified / E99 | < 5 s |
+| 5 | Aggregate | `src/domain/profil.ts` | errors + history | `Profil` (recurrence, evolution) | < 50 ms |
+| 6 | Generate | `src/pipeline/exercise.ts` | dominant type | `ExerciceVerifie` or an honest message | < 6 s |
 
-Orchestration : `src/pipeline/orchestrate.ts` — une `Progression` publiée par étape (état, message,
-durée), budget total 20 s, échec d'une étape traduit en message lisible.
+Orchestration: `src/pipeline/orchestrate.ts` — publishes a `Progression` for each step (state,
+message, duration), with a total budget of 20 s; a failing step becomes a readable message.
 
-**Pourquoi un seul appel pour les étapes 3 et 4.** Chaque aller-retour avec l'amont coûte 16 à 50 s
-(place de marché, modèles parfois sans capacité). Deux appels séquentiels faisaient tomber le budget
-« photo → diagnostic » à 40-90 s ; la fusion le ramène à **22 s en moyenne** (mesuré sur 5 copies du
-corpus). Les **règles** restent locales et inchangées : seuil de 0,6, rétrogradation en `E99`,
-pondération nulle de `E11` — le modèle propose, `normaliserErreur` dispose.
+**Why a single call for steps 3 and 4.** Every round trip with the upstream costs 16 to 50 s
+(marketplace, sometimes no provider capacity). Two sequential calls pushed the "photo → diagnosis"
+budget to 40–90 s; merging them brings it back to **22 s on average** (measured on five papers of
+the corpus). The **rules** remain local and unchanged: the 0.6 threshold, downgrade to `E99`, zero
+weight for `E11` — the model proposes, `normaliserErreur` disposes.
 
-**Pourquoi une seconde passe.** Le risque qualifié de fatal dans le cahier des charges est le faux
-positif. Les fautes typées avec une confiance < 0,75 sont revérifiées par un appel **texte seul**
-(donc rapide) qui confirme, reclasse ou rétrograde en `E99` — sans jamais ajouter de faute. Bornée à
-5 fautes pour tenir la latence.
+**Why a second pass.** The risk qualified as fatal in the brief is the false positive. Mistakes
+typed with confidence < 0.75 are rechecked by a **text-only** call (therefore fast) that confirms,
+reclassifies or downgrades to `E99` — it never adds a mistake. Capped at five mistakes to keep
+latency down.
 
-**Une preuve par étape.** Chaque étape publie, en plus de sa durée, **ce qu'elle a réellement
-produit** : « photo normalisée en 1600 × 2212 px », « bandeau du nom pixelisé (64 % de la largeur) »,
-« 3 annotation(s) relevée(s) sur la copie », « 3 faute(s) typée(s) : E01, E01, E11 », « profil mis à
-jour : type dominant E01 », « exercice tiré de la banque locale sur E01 — garde-fou : 3 critères validés ».
-La preuve est calculée à partir du résultat de l'étape, donc elle ne peut pas mentir ; et elle reste
-visible après l'analyse, dans la « trace de l'analyse » de l'écran Diagnostic. C'est ce qui permet à un
-juge de vérifier le travail sans lire le code.
+**One proof per step.** Along with its duration, each step publishes **what it actually produced**:
+"image normalised to 1600 × 2212 px", "name banner pixelated (64% of width)", "3 annotation(s) read
+from the paper", "3 mistake(s) typed: E01, E01, E11", "profile updated: dominant type E01",
+"exercise drawn from the local bank on E01 — guard: 3 criteria validated". The proof is computed
+from the step's result, so it cannot lie; it remains visible after the analysis, in the "analysis
+trace" of the Diagnosis screen. This is what lets a judge verify the work without reading the code.
 
-**Sonde de santé du proxy.** `src/pipeline/sante.ts` interroge `GET /health` (5 s de timeout) au
-chargement et à chaque changement d'adresse. Si l'amont est `ko`, un bandeau propose la
-démonstration ou le BYOK au lieu de laisser l'utilisateur attendre un échec. La pastille d'état est
-visible dans le pied de page. Le chemin séparé (`extract.ts` + `classify.ts`) reste dans le dépôt :
-il sert de référence au banc de comparaison.
+**Proxy health probe.** `src/pipeline/sante.ts` calls `GET /health` (5 s timeout) on load and on
+every address change. If the upstream reports `ko`, a banner offers the demo or BYOK instead of
+letting the user wait for a failure. The status dot is visible in the footer. The separate path
+(`extract.ts` + `classify.ts`) remains in the repository as a reference for the comparison bench.
 
-### Le point d'injection
+### The injection point
 
-Tout le pipeline parle à un `ClientBrut` (`src/pipeline/client.ts`), jamais à `fetch`. En
-production c'est `completer()` de `src/pipeline/llm.ts` ; en test c'est `clientSimule()`, qui rend
-des réponses JSON enregistrées. Conséquence : **170 tests tournent sans réseau ni quota**, et le
-corpus de validation est rejouable en CI.
+The whole pipeline talks to a `ClientBrut` (`src/pipeline/client.ts`), never to `fetch`. In
+production it is `completer()` from `src/pipeline/llm.ts`; in tests it is `clientSimule()`, which
+returns recorded JSON answers. As a result, **170 tests run without network or quota**, and the
+validation corpus is replayable in CI.
 
-## Le garde-fou de l'étape 6
+## The step-6 guardrail
 
-Deux appels distincts, jamais un seul :
+Two distinct calls, never one:
 
-1. `prompts/generation.md` → l'exercice (énoncé, indices, solution, niveau) ;
-2. `prompts/garde-fou.md` → le verdict sur trois critères : travaille le bon type, ne donne pas la
-   solution d'origine, même niveau.
+1. `prompts/generation.md` → the exercise (statement, hints, solution, level);
+2. `prompts/garde-fou.md` → the verdict on three criteria: it works on the right type, it does not
+   reveal the original solution, and it is at the same level.
 
-Un critère refusé → régénération. Deux tentatives maximum (`MAX_TENTATIVES_EXERCICE`), puis
-`exercice: null` + un message explicite. On ne sert jamais un exercice hors sujet.
+One rejected criterion → regeneration. At most two attempts (`MAX_TENTATIVES_EXERCICE`), then
+`exercice: null` plus an explicit message. An off-topic exercise is never served.
 
-## Modèle de données
+## Data model
 
-Défini dans `src/domain/types.ts`. Stocké en local uniquement (`src/storage/local.ts`, clés dans
-`src/domain/config.ts`) :
+Defined in `src/domain/types.ts`. Stored locally only (`src/storage/local.ts`, keys in
+`src/domain/config.ts`):
 
-- `Diagnostic` — id, horodatage, matière, fautes, type dominant ;
-- `Erreur` — code, libellé, ligne (texte, jamais l'image), explication ≤ 25 mots, confiance,
-  pondération ;
-- `Profil` — occurrences pondérées par type, nombre d'analyses, évolution, et les fautes
-  *signalées mais non pondérées* (E11, E99) ;
-- `StatsClasse` — agrégat du mode professeur (`src/domain/classe.ts`).
+- `Diagnostic` — id, timestamp, subject, mistakes, dominant type;
+- `Erreur` — code, label, line (text, never the image), explanation ≤ 25 words, confidence,
+  weight;
+- `Profil` — weighted occurrences per type, number of analyses, evolution, and mistakes that are
+  *flagged but not weighted* (E11, E99);
+- `StatsClasse` — teacher-mode aggregate (`src/domain/classe.ts`).
 
-Aucune image, aucun nom, aucune donnée personnelle ne traverse la couche de stockage.
+No image, no name, no personal data crosses the storage layer.
 
-## Règles de confidentialité
+## Privacy rules
 
-| Réf | Exigence | Où c'est tenu |
+| Ref | Requirement | Where it is enforced |
 |---|---|---|
-| RNF-P1 | l'image n'est jamais persistée | data URL en mémoire de session, jamais écrite dans IndexedDB |
-| RNF-P2 | nom masqué avant affichage | étape 2, pixelisation du bandeau |
-| RNF-P3 | proxy sans journal de contenu | `api/analyze.ts` : horodatage, statut, latence uniquement |
-| RNF-P4 | historique exportable et supprimable | écran Réglages, `effacerHistorique()` |
-| RNF-P5 | mention explicite dans l'UI | accueil, cadrage, réglages, pied de page |
+| RNF-P1 | the image is never persisted | data URL in session memory, never written to IndexedDB |
+| RNF-P2 | name masked before display | step 2, pixelation of the banner |
+| RNF-P3 | proxy without content logging | `api/analyze.ts`: timestamp, status, latency only |
+| RNF-P4 | history exportable and deletable | Settings screen, `effacerHistorique()` |
+| RNF-P5 | explicit notice in the UI | home, framing, settings, footer |
 
 ## Interface
 
-Huit écrans (`src/ui/screens/`), un routeur maison par état + paramètre `?ecran=` pour partager un
-écran précis pendant la démo. Design : fond `#0d0f14`, jaune `#f5c518` pour le diagnostic, vert
-`#3ecf8e` pour la progression, **aucun rouge** — la copie est déjà annotée en rouge par le
-professeur.
+Eight screens (`src/ui/screens/`), a home-made state router plus a `?ecran=` parameter for sharing
+a specific screen during the demo. Design: `#0d0f14` background, `#f5c518` yellow for diagnosis,
+`#3ecf8e` green for progress, **no red** — the paper is already annotated in red by the teacher.
 
-## Ce que l'architecture permet sans la taxonomie
+## What the architecture allows without the taxonomy
 
-Ajouter une matière (physique) demanderait une nouvelle taxonomie et de nouveaux prompts, pas une
-nouvelle architecture : les étapes 1, 2, 5 et 6 sont indépendantes du domaine. C'est volontairement
-hors périmètre pendant le hackathon.
+Adding a subject (physics) would require a new taxonomy and new prompts, not a new architecture:
+steps 1, 2, 5 and 6 are domain-independent. This is deliberately out of scope.

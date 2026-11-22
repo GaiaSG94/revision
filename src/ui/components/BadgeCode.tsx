@@ -3,7 +3,7 @@ import type { CodeErreur } from '../../domain/taxonomy'
 
 type Props = { code: CodeErreur; confiance?: number }
 
-/** Étiquette d'un type d'erreur : code + libellé + confiance affichée (§17). */
+/** Label for an error type: code + name + displayed confidence (§17). */
 export function BadgeCode({ code, confiance }: Props) {
   const estNonTypee = code === 'E99'
   return (

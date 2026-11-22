@@ -3,10 +3,11 @@ import { CHAINE_MODELES } from '../src/domain/config'
 import { ErreurLLM, completer, transportParDefaut } from '../src/pipeline/llm'
 
 /**
- * Le repli sur la chaîne de modèles est ce qui fait qu'une analyse aboutit un
- * soir où 5 modèles sur 6 sont sans capacité. Ces tests verrouillent aussi un
- * bug réel du 11 novembre : `throw` d'une fonction `async` sans `await` lançait
- * une **Promesse** — donc ni repli, ni message lisible (« Analyse impossible »).
+ * Falling back along the model chain is what lets an analysis succeed on an
+ * evening when 5 models out of 6 are out of capacity. These tests also lock a
+ * real bug from 11 November: `throw` in an `async` function without `await`
+ * threw a **Promise** — hence no fallback and no readable message ("Analysis
+ * impossible").
  */
 
 const transport = transportParDefaut('/api/test')
@@ -27,8 +28,8 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('repli sur la chaîne de modèles', () => {
-  it('un 503 fait passer au modèle suivant, qui répond', async () => {
+describe('model chain fallback', () => {
+  it('a 503 moves to the next model, which answers', async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(reponse(503, { erreur: 'no available provider for A' }))
@@ -41,7 +42,7 @@ describe('repli sur la chaîne de modèles', () => {
     expect(appels[0]).not.toBe(appels[1])
   })
 
-  it('toute la chaîne indisponible → ErreurLLM avec le message réel de l’amont', async () => {
+  it('whole chain unavailable → ErreurLLM with the real upstream message', async () => {
     const fetchMock = vi
       .fn()
       .mockImplementation(async () => reponse(503, { erreur: 'no available provider (all offers exhausted)' }))
@@ -54,10 +55,10 @@ describe('repli sur la chaîne de modèles', () => {
     expect(enregistrerAppels(fetchMock)).toHaveLength(CHAINE_MODELES.length)
   })
 
-  it('429 du proxy (quota partagé) → remonte aussitôt avec le recours BYOK', async () => {
+  it('proxy 429 (shared quota) → raises immediately with BYOK recourse', async () => {
     const fetchMock = vi
       .fn()
-      .mockImplementation(async () => reponse(429, { erreur: 'Quota du proxy atteint pour cette heure.', quota: 'proxy' }))
+      .mockImplementation(async () => reponse(429, { erreur: 'Proxy quota reached for this hour.', quota: 'proxy' }))
     vi.stubGlobal('fetch', fetchMock)
 
     const erreur = await completer(transport, requete).catch((e: unknown) => e)
@@ -66,11 +67,11 @@ describe('repli sur la chaîne de modèles', () => {
     expect(enregistrerAppels(fetchMock)).toHaveLength(1)
   })
 
-  it('429 du fournisseur → pause, même modèle, puis modèle suivant', async () => {
+  it('provider 429 → pause, same model, then next model', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(reponse(429, { erreur: 'Limite de débit du fournisseur.' }))
-      .mockResolvedValueOnce(reponse(429, { erreur: 'Limite de débit du fournisseur.' }))
+      .mockResolvedValueOnce(reponse(429, { erreur: 'Provider rate limit.' }))
+      .mockResolvedValueOnce(reponse(429, { erreur: 'Provider rate limit.' }))
       .mockResolvedValueOnce(reponse(200, { texte: 'ok' }))
     vi.stubGlobal('fetch', fetchMock)
 
@@ -81,7 +82,7 @@ describe('repli sur la chaîne de modèles', () => {
     expect(appels[2]).not.toBe(appels[0])
   }, 20_000)
 
-  it('le proxy a épuisé sa chaîne → un seul appel, on ne rejoue pas la nôtre', async () => {
+  it('proxy exhausted its chain → one call, we do not replay ours', async () => {
     const fetchMock = vi
       .fn()
       .mockImplementation(async () =>
@@ -95,7 +96,7 @@ describe('repli sur la chaîne de modèles', () => {
     expect(enregistrerAppels(fetchMock)).toHaveLength(1)
   })
 
-  it('le modèle qui a réellement répondu est remonté au transport', async () => {
+  it('the model that actually answered is reported to the transport', async () => {
     const vus: string[] = []
     vi.stubGlobal(
       'fetch',
@@ -105,7 +106,7 @@ describe('repli sur la chaîne de modèles', () => {
     expect(vus).toEqual(['ag/gemini-4-carbon'])
   })
 
-  it('en flux (SSE) : la progression est relayée et le texte final rendu', async () => {
+  it('streaming (SSE): progress is relayed and the final text returned', async () => {
     const flux = new ReadableStream({
       start(controleur) {
         controleur.enqueue(
@@ -138,11 +139,11 @@ describe('repli sur la chaîne de modèles', () => {
     expect(modeles).toEqual(['ag/claude-sonnet-4-6'])
   })
 
-  it('en flux : un événement erreur remonte comme une ErreurLLM', async () => {
+  it('streaming: an error event comes back as an ErreurLLM', async () => {
     const flux = new ReadableStream({
       start(controleur) {
         controleur.enqueue(
-          new TextEncoder().encode('event: erreur\ndata: {"erreur":"aucun modèle","statut":503}\n\n'),
+          new TextEncoder().encode('event: erreur\ndata: {"erreur":"no model","statut":503}\n\n'),
         )
         controleur.close()
       },
@@ -158,7 +159,7 @@ describe('repli sur la chaîne de modèles', () => {
     expect((erreur as ErreurLLM).chaineEpuisee).toBe(true)
   })
 
-  it('un proxy qui ne parle pas SSE retombe sur le chemin JSON', async () => {
+  it('a proxy that does not speak SSE falls back to the JSON path', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(
@@ -171,12 +172,12 @@ describe('repli sur la chaîne de modèles', () => {
     await expect(completer({ ...transport, stream: true }, requete)).resolves.toBe('json')
   })
 
-  it('une erreur non transitoire (400) remonte immédiatement', async () => {
-    const fetchMock = vi.fn().mockImplementation(async () => reponse(400, { erreur: 'corps invalide' }))
+  it('a non-transient error (400) raises immediately', async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => reponse(400, { erreur: 'invalid body' }))
     vi.stubGlobal('fetch', fetchMock)
 
     const erreur = await completer(transport, requete).catch((e: unknown) => e)
-    expect((erreur as ErreurLLM).message).toContain('corps invalide')
+    expect((erreur as ErreurLLM).message).toContain('invalid body')
     expect(enregistrerAppels(fetchMock)).toHaveLength(1)
   })
 })

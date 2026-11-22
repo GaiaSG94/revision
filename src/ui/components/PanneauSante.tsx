@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { autoVerifier } from '../../pipeline/diagnostic'
 import type { Controle } from '../../pipeline/diagnostic'
-import { transportDe } from '../../etat/useEtatRature'
-import { useRature } from '../../etat/useRature'
+import { transportDe } from '../../etat/useEtatRevision'
+import { useRature } from '../../etat/useRevision'
 import { Bouton } from './Bouton'
 
 /**
- * Panneau d'auto-vérification : un clic lance de vrais contrôles et affiche
- * **une preuve par sous-système**. C'est la version « je montre » de la page
- * « Comment ça marche » : un juge peut vérifier l'app en direct, sans clé.
+ * Self-check panel: one click runs real checks and shows **one proof per
+ * subsystem**. This is the "show, don't tell" version of the "How it works"
+ * page: a judge can verify the app live, without a key.
  */
 export function PanneauSante() {
   const { reglages } = useRature()

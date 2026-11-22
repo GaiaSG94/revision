@@ -1,12 +1,12 @@
 /**
- * Proxy edge — la clé InferHub ne descend jamais dans le bundle.
+ * Edge proxy — the InferHub key never makes it into the bundle.
  *
- * Contrat : POST {model, messages, …} → relayé tel quel à l'amont
- * [OI]-compatible ; réponse {texte}. Erreurs → {erreur} + statut HTTP.
+ * Contract: POST {model, messages, …} → relayed as-is to the [OI]-compatible
+ * upstream; response {texte}. Errors → {erreur} + HTTP status.
  *
- * Confidentialité (RNF-P3) : on ne journalise QUE l'horodatage, le statut et
- * la latence. Jamais l'image, jamais le texte extrait, jamais la clé, jamais
- * l'IP en clair (elle sert uniquement de clé de quota, en mémoire).
+ * Privacy (RNF-P3): we log ONLY the timestamp, status and latency. Never the
+ * image, never the extracted text, never the key, never the raw IP (it serves
+ * only as an in-memory quota key).
  */
 import { creerQuota } from './_quota'
 
@@ -26,7 +26,7 @@ type Reponse = {
   end: (corps?: string) => void
 }
 
-/** bodyParser désactivé : on lit le flux brut, on ne garde rien en mémoire côté Vercel. */
+/** bodyParser disabled: we read the raw stream and keep nothing in memory on Vercel. */
 export const config = { api: { bodyParser: false } }
 
 const TAILLE_MAX_OCTETS = 15 * 1024 * 1024
@@ -35,7 +35,7 @@ const DELAI_MS = 60_000
 const quota = creerQuota()
 
 function amont(): string {
-  return process.env.RATURE_AMONT ?? 'https://api.inferhub.dev/v1'
+  return process.env.REVISION_AMONT ?? 'https://api.inferhub.dev/v1'
 }
 
 function entete(req: Requete, nom: string): string {
@@ -43,7 +43,7 @@ function entete(req: Requete, nom: string): string {
   return Array.isArray(valeur) ? (valeur[0] ?? '') : (valeur ?? '')
 }
 
-/** Clé de quota : empreinte de l'IP, jamais l'IP elle-même dans les journaux. */
+/** Quota key: fingerprint of the IP, never the IP itself in the logs. */
 function identifiantVisiteur(req: Requete): string {
   const brute = entete(req, 'x-forwarded-for').split(',')[0]?.trim() || 'inconnu'
   let empreinte = 0
@@ -59,13 +59,13 @@ async function lireCorps(req: Requete): Promise<string> {
       const texte = typeof donnees === 'string' ? donnees : decodeur.decode(donnees as Uint8Array, { stream: true })
       taille += texte.length
       if (taille > TAILLE_MAX_OCTETS) {
-        rejeter(new ErreurHttp('Photo trop lourde (15 Mo max après encodage).', 413))
+        rejeter(new ErreurHttp('Photo too large (15 MB max after encoding).', 413))
         return
       }
       morceaux.push(texte)
     })
     req.on?.('end', () => resoudre(morceaux.join('')))
-    req.on?.('error', () => rejeter(new ErreurHttp('Lecture du corps interrompue.', 400)))
+    req.on?.('error', () => rejeter(new ErreurHttp('Body read interrupted.', 400)))
   })
 }
 
@@ -82,7 +82,7 @@ function repondre(res: Reponse, statut: number, corps: unknown, debut: number): 
   res.setHeader('content-type', 'application/json; charset=utf-8')
   res.setHeader('cache-control', 'no-store')
   res.end(JSON.stringify(corps))
-  // Seul journal autorisé : horodatage, statut, latence.
+  // Only allowed log: timestamp, status, latency.
   console.info(`${new Date().toISOString()} ${statut} ${Date.now() - debut}ms`)
 }
 
@@ -94,26 +94,26 @@ function extraireTexte(data: unknown): string {
 export default async function handler(req: Requete, res: Reponse): Promise<void> {
   const debut = Date.now()
   res.setHeader('access-control-allow-origin', entete(req, 'origin') || '*')
-  res.setHeader('access-control-allow-headers', 'content-type, x-rature-cle')
+  res.setHeader('access-control-allow-headers', 'content-type, x-revision-cle')
   res.setHeader('access-control-allow-methods', 'POST, OPTIONS')
 
   if (req.method === 'OPTIONS') return repondre(res, 204, {}, debut)
-  if (req.method !== 'POST') return repondre(res, 405, { erreur: 'Méthode non autorisée.' }, debut)
+  if (req.method !== 'POST') return repondre(res, 405, { erreur: 'Method not allowed.' }, debut)
 
-  const cle = entete(req, 'x-rature-cle').trim() || process.env.INFERHUB_API_KEY || ''
-  if (!cle) return repondre(res, 503, { erreur: 'Proxy non configuré : colle ta clé dans Réglages (BYOK).' }, debut)
+  const cle = entete(req, 'x-revision-cle').trim() || process.env.INFERHUB_API_KEY || ''
+  if (!cle) return repondre(res, 503, { erreur: 'Proxy not configured: paste your key in Settings (BYOK).' }, debut)
 
   const visiteur = identifiantVisiteur(req)
   if (!quota.autoriser(visiteur, Date.now())) {
-    // `quota: proxy` distingue notre plafond d'une limite de débit amont.
-    return repondre(res, 429, { erreur: 'Quota du proxy atteint pour cette heure. Réessaie plus tard.', quota: 'proxy' }, debut)
+    // `quota: proxy` distinguishes our cap from an upstream rate limit.
+    return repondre(res, 429, { erreur: 'Proxy quota reached for this hour. Try again later.', quota: 'proxy' }, debut)
   }
 
   let corps: string
   try {
     corps = await lireCorps(req)
   } catch (erreur) {
-    return repondre(res, erreur instanceof ErreurHttp ? erreur.statut : 400, { erreur: 'Corps illisible.' }, debut)
+    return repondre(res, erreur instanceof ErreurHttp ? erreur.statut : 400, { erreur: 'Unreadable body.' }, debut)
   }
 
   try {
@@ -126,16 +126,16 @@ export default async function handler(req: Requete, res: Reponse): Promise<void>
     const data = await reponse.json()
     if (!reponse.ok) {
       if (reponse.status === 429) {
-        return repondre(res, 429, { erreur: 'Limite de débit du fournisseur de modèles : réessaie dans une minute.' }, debut)
+        return repondre(res, 429, { erreur: 'Model provider rate limit: try again in a minute.' }, debut)
       }
-      const message = (data as { error?: { message?: string } })?.error?.message ?? 'Amont indisponible.'
+      const message = (data as { error?: { message?: string } })?.error?.message ?? 'Upstream unavailable.'
       return repondre(res, reponse.status, { erreur: message }, debut)
     }
     const texte = extraireTexte(data)
-    if (!texte) return repondre(res, 502, { erreur: 'Réponse vide du modèle.' }, debut)
+    if (!texte) return repondre(res, 502, { erreur: 'Empty response from the model.' }, debut)
     return repondre(res, 200, { texte }, debut)
   } catch (erreur) {
     const delai = erreur instanceof Error && erreur.name === 'TimeoutError'
-    return repondre(res, delai ? 504 : 502, { erreur: delai ? 'Analyse trop longue : réessaie.' : 'Amont injoignable.' }, debut)
+    return repondre(res, delai ? 504 : 502, { erreur: delai ? 'Analysis took too long: try again.' : 'Upstream unreachable.' }, debut)
   }
 }

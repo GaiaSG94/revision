@@ -1,19 +1,19 @@
 /**
- * Point d'injection du modèle : tout le pipeline parle à un `ClientBrut`,
- * jamais directement à `fetch`. Les tests fournissent une fonction qui rend
- * du JSON simulé — aucun réseau, aucun quota consommé.
+ * Model injection point: the whole pipeline talks to a `ClientBrut`, never
+ * directly to `fetch`. Tests provide a function returning simulated JSON — no
+ * network, no quota consumed.
  */
 import { completer } from './llm'
 import type { RequeteLLM, Transport } from './llm'
 
 export type ClientBrut = (requete: RequeteLLM) => Promise<string>
 
-/** Client réel : proxy edge ou BYOK, selon le transport. */
+/** Real client: edge proxy or BYOK, depending on the transport. */
 export function clientParDefaut(transport: Transport): ClientBrut {
   return (requete: RequeteLLM) => completer(transport, requete)
 }
 
-/** Client de test : rend la réponse suivante de la file, ou échoue au-delà. */
+/** Test client: returns the next response in the queue, or fails beyond it. */
 export function clientSimule(reponses: string[]): ClientBrut {
   let index = 0
   return async () => {

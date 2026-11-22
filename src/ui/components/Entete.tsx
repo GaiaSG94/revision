@@ -1,17 +1,17 @@
-import { useRature } from '../../etat/useRature'
-import type { Ecran } from '../../etat/useRature'
+import { useRature } from '../../etat/useRevision'
+import type { Ecran } from '../../etat/useRevision'
 
 const LIENS: { ecran: Ecran; libelle: string }[] = [
   { ecran: 'accueil', libelle: 'Paper' },
-  // V9 : navigation réduite à 4 entrées. « Diagnosis » n'est pas un onglet :
-  // on y arrive après une analyse, et le badge « Diagnosis ready » de
-  // l'en-tête y mène. Réglages reste accessible via l'icône ⚙.
+  // V9: navigation reduced to 4 entries. "Diagnosis" is not a tab: you get
+  // there after an analysis, and the header's "Diagnosis ready" badge leads
+  // there. Settings remains accessible via the ⚙ icon.
   { ecran: 'profil', libelle: 'Profile' },
   { ecran: 'prof', libelle: 'Teacher' },
   { ecran: 'apropos', libelle: 'How it works' },
 ]
 
-/** Badge discret : l'analyse continue pendant que l'utilisateur navigue. */
+/** Subtle badge: the analysis continues while the user navigates. */
 function BadgeAnalyse() {
   const { occupe, diagnosticPret, aller, ecran } = useRature()
   if (ecran === 'analyse') return null
@@ -49,7 +49,7 @@ export function Entete() {
         onClick={() => aller('accueil')}
         className="font-[family-name:var(--font-etroite)] text-2xl font-bold italic tracking-tight text-white"
       >
-        errata!
+        revision!
       </button>
       <BadgeAnalyse />
       <nav aria-label="Main navigation" className="flex flex-wrap items-center gap-1">

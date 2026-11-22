@@ -1,35 +1,34 @@
-"""Proxy edge Raturé sur Modal — la clé InferHub ne descend jamais au navigateur.
+"""Revision edge proxy on Modal — the InferHub key never reaches the browser.
 
-Pourquoi Modal : aucun jeton Cloudflare/Vercel exploitable sur les machines, et
-Modal est déjà configuré ici. **CPU uniquement, aucune GPU** : ce proxy ne fait
-que relayer du JSON.
+Why Modal: no usable Cloudflare/Vercel token on the machines, and Modal is
+already configured here. **CPU only, no GPU**: this proxy only relays JSON.
 
-Déploiement :
+Deployment:
     modal deploy proxy/modal_app.py
-Secret (créé une fois) :
+Secret (created once):
     modal secret create inferhub-key --from-json cle.json
 
-Ce que fait ce proxy de plus qu'un simple relais (idées 2, 5 et 9 du brassage
-« rester sur InferHub ») :
+What this proxy does beyond a simple relay (ideas 2, 5 and 9 from the "stay on
+InferHub" brainstorm):
 
-1. **Chaîne de repli côté serveur** : InferHub est une place de marché où 5
-   modèles vision sur 6 peuvent être en 503 au même instant. Le client n'a plus
-   à faire un aller-retour par modèle mort — c'est le proxy qui descend la
-   chaîne, ce qui économise 1 à 5 allers-retours HTTP par analyse.
-2. **Disjoncteur par modèle** : un 402/503 met le modèle en cooldown 60 s, donc
-   on ne repaye pas 1 à 2 s par modèle déjà mort à chaque analyse.
-3. **Enchères paramétrables** : si `RATURE_MAX_IN_PRICE` / `RATURE_MAX_OUT_PRICE`
-   sont posées, les en-têtes `x-max-input-price` / `x-max-output-price` sont
-   transmis. Sans elles, seuls les modèles inclus dans les préférences du compte
-   répondent (les autres rendent 402).
+1. **Server-side fallback chain**: InferHub is a marketplace where 5 out of 6
+   vision models can be in 503 at the same moment. The client no longer has to
+   make a round trip per dead model — the proxy walks the chain, saving 1 to 5
+   HTTP round trips per analysis.
+2. **Per-model circuit breaker**: a 402/503 puts the model in a 60 s cooldown,
+   so we do not pay 1 to 2 s per already-dead model on every analysis.
+3. **Configurable auctions**: if `REVISION_MAX_IN_PRICE` / `REVISION_MAX_OUT_PRICE`
+   are set, the `x-max-input-price` / `x-max-output-price` headers are forwarded.
+   Without them, only models included in the account preferences answer (the
+   others return 402).
 
-Contrat : POST /analyze {model, messages, …} → 200 {"texte": …, "modele": …}.
-L'en-tête `x-rature-cle` (BYOK) remplace la clé serveur s'il est fourni.
-En cas d'échec de toute la chaîne : 503 {"erreur": …, "chaineEpuisee": true} —
-le client s'arrête alors au lieu de rejouer sa propre chaîne.
+Contract: POST /analyze {model, messages, …} → 200 {"texte": …, "modele": …}.
+The `x-revision-cle` header (BYOK) replaces the server key when provided.
+If the whole chain fails: 503 {"erreur": …, "chaineEpuisee": true} — the client
+then stops instead of replaying its own chain.
 
-Journal : horodatage, statut, latence, modèle. Jamais l'image, jamais le texte
-extrait, jamais la clé, jamais l'IP en clair (RNF-P3).
+Log: timestamp, status, latency, model. Never the image, never the extracted
+text, never the key, never the raw IP (RNF-P3).
 """
 
 import json
@@ -38,14 +37,14 @@ import time
 
 import modal
 
-APP_NOM = "rature-proxy"
+APP_NOM = "revision-proxy"
 AMONT_DEFAUT = "https://api.inferhub.dev/v1"
 TAILLE_MAX_OCTETS = 15 * 1024 * 1024
 DELAI_AMONT_S = 90.0
 
-# Chaîne de repli serveur. À garder alignée sur CHAINE_MODELES de
-# src/domain/config.ts : le client commence par son modèle préféré, le proxy
-# termine le travail.
+# Server fallback chain. Keep it aligned with CHAINE_MODELES in
+# src/domain/config.ts: the client starts with its preferred model, the proxy
+# finishes the job.
 CHAINE = [
     "ag/gemini-4-carbon",
     "ag/claude-sonnet-4-6",
@@ -55,8 +54,8 @@ CHAINE = [
     "zai/glm-4.6v",
     "ag/claude-opus-4-6-thinking",
 ]
-# 402 (hors enchère) et 503 (sans capacité) sont transitoires mais coûtent cher :
-# cooldown court pour ne pas les retryer à chaque analyse.
+# 402 (out of auction) and 503 (no capacity) are transient but costly:
+# a short cooldown so they are not retried on every analysis.
 REESSAYABLES = {402, 429, 500, 502, 503, 504}
 COOLDOWN_S = 60
 
@@ -67,8 +66,8 @@ ORIGINES = [
 ]
 
 MAX_CONTENEURS = 4
-PAR_IP_PAR_HEURE = 20 // MAX_CONTENEURS      # 5 par conteneur → ~20/heure/visiteur
-GLOBAL_PAR_JOUR = 400 // MAX_CONTENEURS      # 100 par conteneur → ~400/jour
+PAR_IP_PAR_HEURE = 20 // MAX_CONTENEURS      # 5 per container → ~20/hour/visitor
+GLOBAL_PAR_JOUR = 400 // MAX_CONTENEURS      # 100 per container → ~400/day
 
 image = modal.Image.debian_slim(python_version="3.12").pip_install(
     "fastapi==0.115.*",
@@ -79,7 +78,7 @@ app = modal.App(APP_NOM)
 
 
 def _creer_quota():
-    """Fenêtre glissante en mémoire : {id: [instants]} + compteur journalier."""
+    """In-memory sliding window: {id: [timestamps]} + daily counter."""
     historique: dict[str, list[float]] = {}
     etat = {"jour": 0.0, "utilise": 0}
 
@@ -100,7 +99,7 @@ def _creer_quota():
 
 
 def _creer_disjoncteur():
-    """Cooldown par modèle : un modèle en panne n'est pas retenté pendant 60 s."""
+    """Per-model cooldown: a failing model is not retried for 60 s."""
     hors_service: dict[str, float] = {}
 
     def disponible(modele: str, maintenant: float) -> bool:
@@ -119,7 +118,7 @@ def _creer_disjoncteur():
 
 
 def _empreinte(ip: str) -> str:
-    """Empreinte de l'IP pour le quota : jamais l'IP en clair dans les journaux."""
+    """IP fingerprint for the quota: never the raw IP in the logs."""
     h = 0
     for caractere in ip:
         h = (h * 31 + ord(caractere)) & 0xFFFFFFFF
@@ -127,7 +126,7 @@ def _empreinte(ip: str) -> str:
 
 
 def _chaine_pour(modele_demande: str) -> list[str]:
-    """Le modèle demandé d'abord, puis le reste de la chaîne, sans doublon."""
+    """Requested model first, then the rest of the chain, without duplicates."""
     demande = (modele_demande or "").strip()
     if not demande:
         return list(CHAINE)
@@ -136,8 +135,8 @@ def _chaine_pour(modele_demande: str) -> list[str]:
 
 def _entetes_amont(cle: str) -> dict[str, str]:
     entetes = {"content-type": "application/json", "authorization": "Bearer " + cle}
-    prix_in = os.environ.get("RATURE_MAX_IN_PRICE", "").strip()
-    prix_out = os.environ.get("RATURE_MAX_OUT_PRICE", "").strip()
+    prix_in = os.environ.get("REVISION_MAX_IN_PRICE", "").strip()
+    prix_out = os.environ.get("REVISION_MAX_OUT_PRICE", "").strip()
     if prix_in:
         entetes["x-max-input-price"] = prix_in
     if prix_out:
@@ -155,7 +154,7 @@ def _entetes_amont(cle: str) -> dict[str, str]:
 )
 @modal.asgi_app()
 def analyze():
-    """Point d'entrée ASGI : FastAPI monté dans le conteneur Modal."""
+    """ASGI entry point: FastAPI mounted in the Modal container."""
     from fastapi import FastAPI, Request
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import JSONResponse
@@ -164,14 +163,14 @@ def analyze():
     web.add_middleware(
         CORSMiddleware,
         allow_origins=ORIGINES,
-        # GET pour les sondes (/health, /modeles) appelées depuis le navigateur.
+        # GET for the probes (/health, /modeles) called from the browser.
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["content-type", "x-rature-cle"],
+        allow_headers=["content-type", "x-revision-cle"],
         max_age=600,
     )
     autoriser = _creer_quota()
     disponible, signaler, etat_disjoncteur = _creer_disjoncteur()
-    amont = os.environ.get("RATURE_AMONT", AMONT_DEFAUT)
+    amont = os.environ.get("REVISION_AMONT", AMONT_DEFAUT)
 
     @web.get("/health")
     async def health():
@@ -179,32 +178,32 @@ def analyze():
 
     @web.get("/modeles")
     async def modeles():
-        """Chaîne server + état du disjoncteur : utile au diagnostic, sans clé exposée."""
+        """Server chain + circuit breaker state: useful for diagnostics, with no key exposed."""
         return {"chaine": CHAINE, "disjoncteur": etat_disjoncteur(), "amont": amont}
 
     @web.post("/analyze")
     async def analyser(request: Request):
         debut = time.time()
-        cle = request.headers.get("x-rature-cle", "").strip() or os.environ.get("INFERHUB_API_KEY", "")
+        cle = request.headers.get("x-revision-cle", "").strip() or os.environ.get("INFERHUB_API_KEY", "")
         if not cle:
-            return JSONResponse({"erreur": "Proxy non configuré."}, status_code=503)
+            return JSONResponse({"erreur": "Proxy not configured."}, status_code=503)
 
         ip = request.headers.get("x-forwarded-for", "inconnu").split(",")[0].strip()
         if not autoriser(_empreinte(ip), time.time()):
             return JSONResponse(
-                {"erreur": "Quota du proxy atteint pour cette heure. Réessaie plus tard.", "quota": "proxy"},
+                {"erreur": "Proxy quota reached for this hour. Try again later.", "quota": "proxy"},
                 status_code=429,
             )
 
         corps = await request.body()
         if len(corps) > TAILLE_MAX_OCTETS:
-            return JSONResponse({"erreur": "Photo trop lourde (15 Mo max après encodage)."}, status_code=413)
+            return JSONResponse({"erreur": "Photo too large (15 MB max after encoding)."}, status_code=413)
 
         try:
             charge = json.loads(corps)
         except ValueError:
             _journal(400, debut, "-")
-            return JSONResponse({"erreur": "Corps JSON invalide."}, status_code=400)
+            return JSONResponse({"erreur": "Invalid JSON body."}, status_code=400)
 
         if charge.get("stream") is True:
             return await _relayer_en_flux(
@@ -216,11 +215,11 @@ def analyze():
 
 
 async def _relayer_avec_chaine(charge, cle, amont, debut, disponible, signaler, JSONResponse):
-    """Descend la chaîne de modèles côté serveur, disjoncteur inclus."""
+    """Walks the model chain server-side, circuit breaker included."""
     import httpx
 
     demande = str(charge.get("model") or "")
-    derniere_erreur = "aucun modèle disponible"
+    derniere_erreur = "no model available"
     dernier_statut = 503
     tentes = 0
 
@@ -238,7 +237,7 @@ async def _relayer_avec_chaine(charge, cle, amont, debut, disponible, signaler, 
                 )
             except httpx.HTTPError:
                 signaler(modele, time.time(), True)
-                derniere_erreur, dernier_statut = "Amont injoignable ou trop lent.", 504
+                derniere_erreur, dernier_statut = "Upstream unreachable or too slow.", 504
                 continue
 
             if reponse.status_code == 200:
@@ -246,7 +245,7 @@ async def _relayer_avec_chaine(charge, cle, amont, debut, disponible, signaler, 
                 texte = _extraire_texte(reponse.text)
                 if not texte:
                     _journal(502, debut, modele)
-                    return JSONResponse({"erreur": "Réponse vide du modèle."}, status_code=502)
+                    return JSONResponse({"erreur": "Empty response from the model."}, status_code=502)
                 _journal(200, debut, modele, tentes)
                 return JSONResponse(
                     {"texte": texte, "modele": modele, "tentatives": tentes},
@@ -267,13 +266,13 @@ async def _relayer_avec_chaine(charge, cle, amont, debut, disponible, signaler, 
 
 
 async def _relayer_en_flux(charge, cle, amont, debut, disponible, signaler, JSONResponse):
-    """Streaming SSE (idée 7) : pendant que l'amont réfléchit, on publie ce qui
-    se passe — « modèle 2/6 : 503, essai suivant ». L'attente devient une
-    démonstration de robustesse au lieu d'un spinner muet.
+    """SSE streaming (idea 7): while the upstream thinks, we publish what is
+    happening — "model 2/6: 503, trying next". Waiting becomes a demonstration
+    of robustness instead of a silent spinner.
 
-    Le format est volontairement simple : des événements `progres` puis un
-    événement `resultat`. Un client qui ne parle pas SSE retombe sur le chemin
-    JSON classique (l'endpoint `/analyze` reste compatible).
+    The format is deliberately simple: `progres` events then a `resultat`
+    event. A client that does not speak SSE falls back to the classic JSON path
+    (the `/analyze` endpoint stays compatible).
     """
     import httpx
     from fastapi.responses import StreamingResponse
@@ -282,7 +281,7 @@ async def _relayer_en_flux(charge, cle, amont, debut, disponible, signaler, JSON
     charge.pop("stream", None)
 
     async def generateur():
-        derniere_erreur = "aucun modèle disponible"
+        derniere_erreur = "no model available"
         dernier_statut = 503
         tentes = 0
         async with httpx.AsyncClient(timeout=DELAI_AMONT_S) as client:
@@ -299,7 +298,7 @@ async def _relayer_en_flux(charge, cle, amont, debut, disponible, signaler, JSON
                     )
                 except httpx.HTTPError:
                     signaler(modele, time.time(), True)
-                    derniere_erreur, dernier_statut = "Amont injoignable ou trop lent.", 504
+                    derniere_erreur, dernier_statut = "Upstream unreachable or too slow.", 504
                     yield _evenement("progres", {"modele": modele, "statut": 504, "essai": tentes})
                     continue
 
@@ -335,16 +334,16 @@ async def _relayer_en_flux(charge, cle, amont, debut, disponible, signaler, JSON
 
 
 def _evenement(nom: str, donnees: dict) -> str:
-    """Un événement SSE : `event: nom` puis `data: {...}`."""
+    """An SSE event: `event: name` then `data: {...}`."""
     return "event: %s\ndata: %s\n\n" % (nom, json.dumps(donnees, ensure_ascii=False))
 
 
 def _message_amont(corps: str) -> str:
-    """Message d'erreur lisible, sans révéler la clé ni l'amont."""
+    """Readable error message, without revealing the key or the upstream."""
     try:
-        return str(json.loads(corps).get("error", {}).get("message", "Amont indisponible."))[:200]
+        return str(json.loads(corps).get("error", {}).get("message", "Upstream unavailable."))[:200]
     except (ValueError, AttributeError):
-        return "Amont indisponible."
+        return "Upstream unavailable."
 
 
 def _extraire_texte(corps: str) -> str:
@@ -356,8 +355,8 @@ def _extraire_texte(corps: str) -> str:
 
 
 def _journal(statut: int, debut: float, modele: str, tentatives: int = 0) -> None:
-    """Seul journal autorisé : horodatage, statut, latence, modèle, tentatives."""
+    """Only allowed log: timestamp, status, latency, model, attempts."""
     print(
-        "%s %d %dms modele=%s tentatives=%d"
+        "%s %d %dms model=%s attempts=%d"
         % (time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), statut, (time.time() - debut) * 1000, modele, tentatives)
     )

@@ -2,40 +2,40 @@ import { MAX_TENTATIVES_EXERCICE } from '../../../domain/config'
 import { Section } from './Section'
 import { SECTIONS } from './catalogue'
 
-/** Les trois booléens rendus par `prompts/garde-fou.md` — jugés après génération. */
+/** The three booleans returned by `prompts/garde-fou.md` — judged after generation. */
 const CRITERES: { cle: string; question: string; exemple: string }[] = [
   {
     cle: 'travailleLeBonType',
-    question: 'L’exercice fait-il réellement faire le geste du type visé ?',
-    exemple: 'Pour E01 « signe perdu », il faut un développement avec des signes à traiter.',
+    question: 'Does the exercise really make you perform the move of the targeted type?',
+    exemple: 'For E01 "lost sign", it must be an expansion with signs to handle.',
   },
   {
     cle: 'neDonneLaSolutionOrigine',
-    question: 'Évite-t-il de recopier l’exercice d’origine et sa solution ?',
-    exemple: 'Mêmes nombres, même énoncé = refus : on travaille, on ne rejoue pas la copie.',
+    question: 'Does it avoid copying the original exercise and its solution?',
+    exemple: 'Same numbers, same prompt = refusal: we practise, we do not replay the paper.',
   },
   {
     cle: 'memeNiveau',
-    question: 'Le niveau est-il cohérent avec la copie analysée ?',
-    exemple: 'Ni trop simple (aucun progrès), ni hors de portée (aucune réussite possible).',
+    question: 'Is the level consistent with the analysed paper?',
+    exemple: 'Neither too easy (no progress) nor out of reach (no success possible).',
   },
 ]
 
-/** Message réellement renvoyé par `src/pipeline/exercise.ts` quand tout échoue. */
+/** Message really returned by `src/pipeline/exercise.ts` when everything fails. */
 const REFUS =
-  'Exercice non disponible pour ce type (Puissance mal gérée) : mieux vaut rien qu’un exercice à côté du sujet.'
+  'Exercise unavailable for this type (Mishandled power): better nothing than an off-topic exercise.'
 
-/** Section 3 : l'exercice est généré, puis jugé — et le refus est assumé. */
+/** Section 3: the exercise is generated, then judged — and refusal is accepted. */
 export function SectionGardeFou() {
   return (
     <Section {...SECTIONS.gardeFou}>
       <p className="text-sm text-muet">
-        Un exercice hors sujet est pire que pas d’exercice : l’élève travaille à côté de sa faille et
-        l’application ment. La génération et le jugement sont donc{' '}
-        <span className="text-texte">deux appels distincts, jamais un seul</span> — le modèle qui
-        écrit l’exercice n’est pas celui qui le valide.
+        An off-topic exercise is worse than no exercise: the student works beside their weakness and
+        the app lies. Generation and judging are therefore{' '}
+        <span className="text-texte">two separate calls, never a single one</span> — the model that
+        writes the exercise is not the one that validates it.
       </p>
-      <h3 className="text-lg font-semibold text-texte">Les trois critères vérifiés</h3>
+      <h3 className="text-lg font-semibold text-texte">The three checks</h3>
       <ul className="space-y-2">
         {CRITERES.map((critere, index) => (
           <li key={critere.cle} className="rounded-lg border border-bord bg-surface-2 p-3">
@@ -52,13 +52,13 @@ export function SectionGardeFou() {
       <div className="space-y-2 rounded-xl border border-jaune/50 bg-jaune/10 p-3 text-sm">
         <p className="text-texte">
           <span className="font-semibold text-jaune">
-            {MAX_TENTATIVES_EXERCICE} tentatives maximum.
+            {MAX_TENTATIVES_EXERCICE} attempts maximum.
           </span>{' '}
-          Un seul critère refusé déclenche une régénération, motifs du refus à l’appui. Au-delà, le
-          pipeline rend <span className="font-mono">exercice: null</span> et un message explicite :
-          jamais un exercice douteux pour remplir l’écran.
+          A single failed check triggers regeneration, with the reasons for refusal. Beyond that, the
+          pipeline returns <span className="font-mono">exercice: null</span> and an explicit message:
+          never a doubtful exercise just to fill the screen.
         </p>
-        <p className="rounded bg-surface px-2 py-1 font-mono text-xs text-jaune">« {REFUS} »</p>
+        <p className="rounded bg-surface px-2 py-1 font-mono text-xs text-jaune">"{REFUS}"</p>
       </div>
     </Section>
   )

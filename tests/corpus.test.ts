@@ -16,13 +16,13 @@ const transport = transportParDefaut('/api/test')
 const IMAGE = 'data:image/jpeg;base64,AAA'
 const MAINTENANT = '2026-11-11T10:00:00.000Z'
 
-/** L'extraction simulée : mêmes annotations que la fixture. */
+/** Simulated extraction: the same annotations as the fixture. */
 function extractionDe(fixture: FixtureCopie) {
   return { annotations: fixture.annotations, copiePropre: fixture.estPropre }
 }
 
-describe('RNF-03 — classification sur le corpus', () => {
-  it('au moins 80 % des copies retrouvent leur type dominant', async () => {
+describe('RNF-03 — classification on the corpus', () => {
+  it('at least 80% of papers recover their dominant type', async () => {
     let bons = 0
     for (const fixture of COPIES_CORRIGEES) {
       const erreurs = await classerAnnotations(
@@ -36,7 +36,7 @@ describe('RNF-03 — classification sur le corpus', () => {
     expect(bons / COPIES_CORRIGEES.length).toBeGreaterThanOrEqual(0.8)
   })
 
-  it('une annotation peu sûre devient E99 et sort du profil', async () => {
+  it('an uncertain annotation becomes E99 and leaves the profile', async () => {
     const fixture = COPIES_CORRIGEES[3]!
     const erreurs = await classerAnnotations(
       extractionDe(fixture),
@@ -48,7 +48,7 @@ describe('RNF-03 — classification sur le corpus', () => {
     expect(codes).toContain('E99')
   })
 
-  it('E11 reste signalée mais ne pèse pas sur le dominant', async () => {
+  it('E11 stays reported but does not weigh on the dominant type', async () => {
     const fixture = COPIES_CORRIGEES[0]!
     const erreurs = await classerAnnotations(
       extractionDe(fixture),
@@ -60,8 +60,8 @@ describe('RNF-03 — classification sur le corpus', () => {
   })
 })
 
-describe('RNF-04 — zéro faux positif sur une copie propre', () => {
-  it('aucune faute, et aucun appel de classification', async () => {
+describe('RNF-04 — zero false positive on a clean paper', () => {
+  it('no error, and no classification call', async () => {
     for (const fixture of COPIES_PROPRES) {
       const extraction = await extraireAnnotations(
         IMAGE,
@@ -69,7 +69,7 @@ describe('RNF-04 — zéro faux positif sur une copie propre', () => {
         clientSimule([reponseExtraction(fixture)]),
       )
       expect(extraction.copiePropre).toBe(true)
-      // clientSimule([]) lèverait si un appel était tenté : la garantie est là.
+      // clientSimule([]) would throw if a call were attempted: the guarantee is there.
       const erreurs = await classerAnnotations(extraction, transport, clientSimule([]))
       expect(erreurs).toHaveLength(0)
       const diagnostic = construireDiagnostic(erreurs, { id: fixture.id, createdAt: MAINTENANT })

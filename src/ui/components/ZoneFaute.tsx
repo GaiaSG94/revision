@@ -11,8 +11,8 @@ type Props = {
 }
 
 /**
- * Rectangle cliquable d'une faute. C'est un vrai <button> : accessible au
- * clavier, avec un aria-label parlant. Jaune uniquement — jamais de rouge.
+ * Clickable rectangle for an error. It is a real <button>: keyboard accessible,
+ * with a meaningful aria-label. Yellow only — never red.
  */
 export function ZoneFaute({ index, code, zone, selectionne, onSelect }: Props) {
   return (

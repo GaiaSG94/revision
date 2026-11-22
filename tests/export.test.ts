@@ -18,8 +18,8 @@ function jeuDeTest() {
   return { profil: agreger(profilVide(), diagnostic), diagnostics: [diagnostic] }
 }
 
-describe('export CSV du profil (RF-21)', () => {
-  it('en-tête, tri par fréquence et total', () => {
+describe('profile CSV export (RF-21)', () => {
+  it('header, sort by frequency and total', () => {
     const csv = profilEnCsv(jeuDeTest().profil)
     const lignes = csv.split('\n')
     expect(lignes[0]).toBe('code,label,count,percent')
@@ -28,29 +28,29 @@ describe('export CSV du profil (RF-21)', () => {
     expect(lignes.at(-1)).toContain('total')
   })
 
-  it('un profil vide ne casse pas l’export', () => {
+  it('an empty profile does not break the export', () => {
     const csv = profilEnCsv(profilVide())
     expect(csv).not.toContain('undefined')
     expect(csv.split('\n')).toHaveLength(2)
   })
 })
 
-describe('fiche de révision Markdown (RF-22)', () => {
-  it('cite le type dominant et reste bienveillante', () => {
+describe('Markdown revision sheet (RF-22)', () => {
+  it('cites the dominant type and stays caring', () => {
     const { profil, diagnostics } = jeuDeTest()
     const fiche = ficheEnMarkdown(profil, diagnostics)
     expect(fiche).toContain('lost sign')
-    expect(fiche.toLowerCase()).not.toContain('tu as fait')
+    expect(fiche.toLowerCase()).not.toContain('you made')
     expect(fiche).toContain('My recent papers')
   })
 
-  it('profil vide : message d’invitation, pas de tableau', () => {
+  it('empty profile: invitation message, no table', () => {
     expect(ficheEnMarkdown(profilVide(), [])).toContain('No recurring mistake')
   })
 })
 
-describe('mode prof (RF-20)', () => {
-  it('statistique de classe et son CSV', () => {
+describe('teacher mode (RF-20)', () => {
+  it('class statistic and its CSV', () => {
     const { diagnostics } = jeuDeTest()
     const stats = statsClasse([...diagnostics, ...diagnostics])
     expect(stats.nbCopies).toBe(2)
@@ -59,7 +59,7 @@ describe('mode prof (RF-20)', () => {
     expect(statsEnCsv(stats).split('\n')[0]).toBe('papers,code,label,count,percent')
   })
 
-  it('nom de fichier daté', () => {
-    expect(nomFichierDate('rature-profil', 'csv')).toMatch(/^rature-profil-\d{4}-\d{2}-\d{2}T.*\.csv$/)
+  it('date-stamped filename', () => {
+    expect(nomFichierDate('revision-profil', 'csv')).toMatch(/^revision-profil-\d{4}-\d{2}-\d{2}T.*\.csv$/)
   })
 })

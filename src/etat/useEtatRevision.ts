@@ -1,7 +1,7 @@
 /**
- * État de l'application : écran courant, données locales, réglages, santé du
- * proxy. Séparé des actions (`useActions.ts`) pour garder chaque fonction sous
- * la limite de 50 lignes.
+ * Application state: current screen, local data, settings, proxy health.
+ * Separated from actions (`useActions.ts`) to keep each function under the
+ * 50-line limit.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { MODELE_PAR_DEFAUT, PROXY_PAR_DEFAUT } from '../domain/config'
@@ -46,21 +46,21 @@ export type Etat = {
   progression: Progression[]
   erreur: string | null
   occupe: boolean
-  /** Identifiant de la copie de démo en cours, null en analyse réelle. */
+  /** Identifier of the current demo paper, null in a real analysis. */
   demoId: string | null
-  /** Santé du proxy : ok / ko (repli démo proposé) / inconnue. */
+  /** Proxy health: ok / ko (demo fallback offered) / inconnue. */
   santeProxy: SanteProxy
-  /** Chaîne de modèles réordonnée d'après le disjoncteur du proxy (idée 5). */
+  /** Model chain reordered according to the proxy's circuit breaker (idea 5). */
   chaineModeles: string[] | null
-  /** Modèle qui a réellement répondu au dernier appel, pour l'afficher. */
+  /** Model that actually answered the last call, for display. */
   modeleRepondu: string | null
-  /** Analyse terminée pendant que l'utilisateur naviguait ailleurs (idée 8). */
+  /** Analysis finished while the user was navigating elsewhere (idea 8). */
   diagnosticPret: boolean
-  /** Dernière progression publiée par le proxy (streaming, idée 7). */
+  /** Latest progress published by the proxy (streaming, idea 7). */
   messageProgres: string | null
-  /** Identifiants des exercices déjà servis (pour en proposer un autre). */
+  /** Identifiers of exercises already served (to offer another one). */
   exercicesVus: string[]
-  /** Dernier fichier analysé : permet un « Try again » sans re-choisir la photo. */
+  /** Last analysed file: allows a "Try again" without re-selecting the photo. */
   dernierFichier: File | null
 }
 
@@ -90,10 +90,10 @@ export function etatInitial(): Etat {
   }
 }
 
-/** Transport effectif : proxy edge, ou clé personnelle si elle est fournie. */
 /**
- * Transport effectif. `surModele` remplit l'état pour que l'UI puisse dire quel
- * modèle a réellement répondu (transparence sur un amont qui change tout le temps).
+ * Effective transport: edge proxy, or personal key if provided. `surModele`
+ * fills the state so the UI can say which model actually answered
+ * (transparency about an upstream that changes all the time).
  */
 export function transportDe(
   reglages: Reglages,
@@ -106,7 +106,7 @@ export function transportDe(
   return {
     proxy: reglages.proxy.trim() || PROXY_PAR_DEFAUT,
     modele: reglages.modele.trim() || MODELE_PAR_DEFAUT,
-    // Streaming : le proxy publie sa progression pendant que l'amont réfléchit.
+    // Streaming: the proxy publishes its progress while the upstream thinks.
     stream: true,
     ...(reglages.clePersonnelle.trim() ? { cle: reglages.clePersonnelle.trim() } : {}),
     ...(options.chaine ? { chaine: options.chaine } : {}),
@@ -118,8 +118,8 @@ export function transportDe(
 export function messageErreur(erreur: unknown): string {
   if (erreur instanceof Error) {
     const statut = (erreur as { statut?: number }).statut ?? 0
-    // 503/504 : la place de marché n'a pas de capacité maintenant. Message
-    // honnête + issue de secours (la démo hors ligne ne dépend pas du réseau).
+    // 503/504: the marketplace has no capacity right now. Honest message +
+    // fallback (the offline demo does not depend on the network).
     if (statut === 503 || statut === 504) {
       return 'The model provider has no capacity right now. Try again in a moment — or run the offline demo below.'
     }
@@ -128,13 +128,13 @@ export function messageErreur(erreur: unknown): string {
   return 'Analysis failed. Try again in a moment.'
 }
 
-/** Réseau ou amont épuisé : c'est le signal qui allume la pastille « ko ». */
+/** Network or upstream exhausted: this is the signal that lights the "ko" dot. */
 export function amontMort(erreur: unknown): boolean {
   const statut = erreur instanceof Error && 'statut' in erreur ? (erreur as { statut: number }).statut : 0
   return [0, 502, 503, 504].includes(statut)
 }
 
-/** Remplace l'état d'une étape dans la liste (une ligne par étape, pas un journal). */
+/** Replaces a step's state in the list (one line per step, not a log). */
 export function fusionner(liste: Progression[], nouvelle: Progression): Progression[] {
   return [...liste.filter((p) => p.etape !== nouvelle.etape), nouvelle]
 }
@@ -155,9 +155,9 @@ export function useEtatRature() {
     })()
   }, [])
 
-  // Sonde du proxy au chargement puis à chaque changement d'adresse. On sonde
-  // l'adresse EFFECTIVE (repli inclus) : la valeur brute des réglages est vide
-  // tant que l'utilisateur n'a rien saisi.
+  // Probe the proxy on load and on every address change. We probe the EFFECTIVE
+  // address (including fallback): the raw setting is empty until the user has
+  // entered something.
   const proxyActif = transportDe(etat.reglages).proxy
   useEffect(() => {
     void (async () => {
@@ -173,7 +173,7 @@ export function useEtatRature() {
     setEtat((precedent) => ({
       ...precedent,
       ecran,
-      // Le badge « diagnostic prêt » s'éteint dès qu'on va le voir.
+      // The "diagnosis ready" badge turns off as soon as we go see it.
       diagnosticPret: ecran === 'diagnostic' ? false : precedent.diagnosticPret,
     }))
     const url = new URL(window.location.href)

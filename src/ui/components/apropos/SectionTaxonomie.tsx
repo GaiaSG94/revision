@@ -4,37 +4,37 @@ import { Section } from './Section'
 import { SECTIONS } from './catalogue'
 import { TypeReplie } from './TypeReplie'
 
-/** Les trois verrous qui tiennent le diagnostic — le seuil vient de la config. */
+/** The three locks that hold the diagnosis — the threshold comes from config. */
 function verrous(seuil: string): { regle: string; effet: string }[] {
   return [
     {
-      regle: 'Une faute = un seul type',
+      regle: 'One error = one single type',
       effet:
-        'même quand deux causes se superposent, on arbitre. C’est ce qui rend le profil comptable et la précision mesurable.',
+        'even when two causes overlap, we arbitrate. This is what makes the profile countable and accuracy measurable.',
     },
     {
-      regle: `Confiance < ${seuil} → E99 « non typée »`,
+      regle: `Confidence < ${seuil} → E99 "untyped"`,
       effet:
-        'la faute est affichée, mais elle est exclue du profil : on ne construit aucun plan de travail sur un doute.',
+        'the error is displayed, but excluded from the profile: we build no work plan on a doubt.',
     },
     {
-      regle: 'E11 « erreur de recopie » pondérée à 0',
+      regle: 'E11 "copying mistake" weighted at 0',
       effet:
-        'elle est signalée à l’élève, mais elle ne pèse pas dans ses failles : une inattention n’est pas une lacune.',
+        'it is reported to the student, but does not weigh on their weaknesses: carelessness is not a gap.',
     },
   ]
 }
 
-/** Section 2 : la taxonomie fermée, repliée par défaut, et ses trois verrous. */
+/** Section 2: the closed taxonomy, collapsed by default, and its three locks. */
 export function SectionTaxonomie() {
   const types = glossaire()
   const seuil = SEUIL_CONFIANCE.toString().replace('.', ',')
   return (
     <Section {...SECTIONS.taxonomie}>
       <p className="text-sm text-muet">
-        Le modèle n’invente jamais de catégorie : il choisit parmi ces {types.length} codes fermés,
-        ou répond <span className="font-mono text-texte">E99</span>. C’est ce verrou qui rend le
-        diagnostic mesurable — et qui empêche une réponse floue de passer pour une analyse.
+        The model never invents a category: it chooses from these {types.length} closed codes,
+        or answers <span className="font-mono text-texte">E99</span>. This lock is what makes the
+        diagnosis measurable — and prevents a vague answer from passing as an analysis.
       </p>
       <div className="space-y-2">
         {types.map((explication) => (
@@ -42,10 +42,10 @@ export function SectionTaxonomie() {
         ))}
       </div>
       <p className="text-xs text-muet">
-        Déplie un type : pourquoi cette erreur arrive, le geste concret qui l’évite, un exemple faux
-        et sa version juste, et le piège voisin qui lui ressemble.
+        Expand a type: why this error happens, the concrete move that avoids it, a wrong example
+        and its correct version, and the neighbouring trap it resembles.
       </p>
-      <h3 className="pt-1 text-lg font-semibold text-texte">Les trois verrous</h3>
+      <h3 className="pt-1 text-lg font-semibold text-texte">The three locks</h3>
       <ul className="space-y-2">
         {verrous(seuil).map((verrou) => (
           <li

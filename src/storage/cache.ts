@@ -1,15 +1,14 @@
 /**
- * Cache local des analyses — idée 4 du brassage « rester sur InferHub ».
+ * Local analysis cache — idea 4 from the "stay on InferHub" brainstorm.
  *
- * Pourquoi côté client et pas côté proxy : un cache serveur conserverait le
- * texte extrait d'une copie d'élève, ce que RNF-P3 interdit (« le proxy ne
- * loggue ni les images ni les textes extraits »). Le cache local reste dans
- * IndexedDB, sur l'appareil, avec l'historique — et il est supprimable en un
- * clic. Contrepartie assumée : deux visiteurs qui analysent la même photo ne
- * se partagent pas la réponse.
+ * Why client-side and not proxy-side: a server cache would keep the text
+ * extracted from a student's paper, which RNF-P3 forbids ("the proxy logs
+ * neither images nor extracted text"). The local cache stays in IndexedDB, on
+ * the device, with the history — and can be cleared in one click. Accepted
+ * trade-off: two visitors analysing the same photo do not share the answer.
  *
- * Ce qui est mis en cache : le diagnostic structuré, les annotations et
- * l'exercice. **Jamais l'image** (RNF-P1) : la clé est son empreinte SHA-256.
+ * What is cached: the structured diagnosis, the annotations and the exercise.
+ * **Never the image** (RNF-P1): the key is its SHA-256 fingerprint.
  */
 import { del, get, keys, set } from 'idb-keyval'
 import { CLES } from '../domain/config'
@@ -22,13 +21,13 @@ export type AnalyseEnCache = {
   exercice: ExerciceVerifie | null
   revue?: BilanRevue
   messageExercice?: string
-  /** Modèle qui avait répondu : affiché pour la transparence. */
+  /** Model that had answered: displayed for transparency. */
   modele?: string
 }
 
-/** Durée de validité : une copie corrigée ne change pas, mais les prompts si. */
+/** Time to live: a corrected paper does not change, but prompts do. */
 export const TTL_CACHE_MS = 24 * 60 * 60 * 1000
-/** Au-delà, on purge les plus anciennes : le cache ne doit pas grossir indéfiniment. */
+/** Beyond this, the oldest entries are purged: the cache must not grow indefinitely. */
 export const MAX_ENTREES_CACHE = 40
 
 const PREFIXE = `${CLES.cache}/`
@@ -57,7 +56,7 @@ export async function ecrireCache(empreinte: string, analyse: AnalyseEnCache): P
   await purgerCache()
 }
 
-/** Supprime les entrées périmées, puis les plus anciennes au-delà du plafond. */
+/** Removes expired entries, then the oldest ones beyond the cap. */
 export async function purgerCache(): Promise<number> {
   const cles = (await keys()).filter((cle) => typeof cle === 'string' && cle.startsWith(PREFIXE)) as string[]
   const maintenant = Date.now()

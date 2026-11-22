@@ -1,8 +1,8 @@
 import type { EtapeId } from './types'
 
 /**
- * Les six étapes du pipeline, dans l'ordre. Source unique des libellés :
- * l'orchestrateur et l'écran d'analyse les lisent ici, jamais en double.
+ * The six pipeline steps, in order. Single source of labels: the orchestrator
+ * and the analysis screen read them here, never duplicated.
  */
 export const ETAPES: { id: EtapeId; libelle: string }[] = [
   { id: 'ingest', libelle: 'Reading the photo' },
